@@ -4,6 +4,19 @@
 
 A browser front-end (desktop and phone) for [Claude Code](https://docs.anthropic.com/claude-code) running on a Mac. It uses [ttyd](https://github.com/tsl0922/ttyd) + tmux to keep several claude sessions alive and lets you switch between them with tabs at the bottom of the screen.
 
+**For** people who run several Claude Code jobs at once and switch between phone and PC.
+
+**Why**
+- **Same screen on phone and PC.** Both open the very same tmux sessions — start on the PC, continue on the phone mid-task.
+- **One tap between jobs.** Sessions are tabs; switching is a single tap or Alt+number.
+- **Status at a glance.** Blinking = working, orange = needs you, green = done. No need to open each session.
+- **Your real Claude Code.** Runs on your own Mac with your files, tools and settings. Nothing to install on the phone — just a browser.
+
+**Limits**
+- No push notifications: colors show only while the page is open.
+- macOS only, and the Mac must stay on.
+- Remote access needs your own tunnel + authentication.
+
 ![cchat demo](docs/demo.gif)
 
 *One-minute walkthrough ([mp4](docs/demo.mp4)).*
