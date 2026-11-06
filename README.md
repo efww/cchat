@@ -4,6 +4,10 @@
 
 A browser front-end (desktop and phone) for [Claude Code](https://docs.anthropic.com/claude-code) running on a Mac. It uses [ttyd](https://github.com/tsl0922/ttyd) + tmux to keep several claude sessions alive and lets you switch between them with tabs at the bottom of the screen.
 
+![cchat demo](docs/demo.gif)
+
+*One-minute walkthrough ([mp4](docs/demo.mp4)).*
+
 ## Features
 
 - **Session tabs**: the bottom two rows are session tabs. The top row shows the number; the bottom row shows the session label (cut off with `…` when too long).
@@ -14,6 +18,16 @@ A browser front-end (desktop and phone) for [Claude Code](https://docs.anthropic
 - **Desktop shortcuts**: Alt(Option)+number = go to that session, Alt+←/→ = previous/next. Ctrl+V pastes your local (browser) clipboard.
 - **Phone**: finger-drag scrolling, a key bar (Esc, Tab, arrows, …), dark theme.
 - Sessions live inside tmux, so they keep running after you close the browser. Open the URL with `?arg=name` to attach to that session (created if missing).
+
+## How to use
+
+1. **Open a session**: go to `http://127.0.0.1:7681/cchat/?arg=1`. Each `?arg=name` is its own claude session; a new name creates a new tab.
+2. **Start a task and move on**: type your prompt, press Enter, then switch to another tab with **Alt+number** (or click it). The tab you left blinks gray while claude works.
+3. **Watch the colors**: when that tab turns **green**, the answer is ready; **orange** means claude is waiting for your approval or an answer.
+4. **Go back**: click the tab, or use **Alt+←/→**. Opening a tab clears its color. Approve in the orange tab and claude continues.
+5. **Close the browser any time**: sessions keep running in tmux. Open the page again and everything is where you left it. Type `/exit` in a session to close its tab.
+
+On a phone, tap a tab to switch; drag with your finger to scroll, and use the key bar for Esc, Tab and arrows.
 
 ## Requirements
 
