@@ -21,6 +21,29 @@ Claude Code를 브라우저(PC·폰)에서 쓰는 웹 터미널. 맥 한 대에�
 
 *1분 사용 시연 ([mp4](docs/demo.mp4)). 화면 안내 문구는 영어입니다.*
 
+## 설치
+
+맥에서 Claude Code(또는 다른 코딩 에이전트)에 이 문장을 붙여 넣으면 됩니다:
+
+```
+https://github.com/efww/cchat 을 ~/cchat 에 clone하고, ~/cchat/INSTALL.md 를 읽고 그대로 따라서 이 맥에 cchat을 설치해줘.
+```
+
+필요한 것(macOS, Homebrew, Claude Code)을 확인하고 `ttyd`·`tmux`를 깐 뒤, 세 가지(작업 폴더, 권한 모드, 포트)를 물어보고 설치해서 페이지까지 열어 줍니다.
+
+<details><summary>직접 설치</summary>
+
+```sh
+brew install ttyd tmux
+git clone https://github.com/efww/cchat.git ~/cchat && cd ~/cchat
+cp cchat.conf.example my.conf     # WORKDIR, PERMISSION_MODE, PORT 고치기
+./install.sh -c my.conf
+open "http://127.0.0.1:7681/cchat/?arg=1"
+```
+
+업데이트: `git pull && ./install.sh -c my.conf`. 지우는 법과 자세한 내용: [INSTALL.md](INSTALL.md)(영어).
+</details>
+
 ## 무엇이 되나
 
 - **대화 탭**: 맨 아래 두 줄이 대화 탭. 위 줄은 번호, 아래 줄은 대화 이름표(길면 `…`로 줄임).
@@ -41,21 +64,6 @@ Claude Code를 브라우저(PC·폰)에서 쓰는 웹 터미널. 맥 한 대에�
 5. **브라우저는 아무 때나 닫아도 된다**: 대화는 tmux에서 계속 돈다. 다시 열면 그대로 있다. 대화에서 `/exit`를 치면 그 탭이 닫힌다.
 
 폰에서는 탭을 눌러 옮기고, 손가락으로 끌어 스크롤하고, 키 바로 Esc·Tab·화살표를 쓴다.
-
-## 필요한 것
-
-macOS, Homebrew `ttyd` `tmux`, python3, [Claude Code](https://docs.anthropic.com/claude-code) CLI(`~/.local/bin/claude`).
-
-## 설치
-
-```sh
-cp cchat.conf.example my.conf     # 값 고치기 (작업 폴더, 포트, 권한 모드 등)
-./install.sh -c my.conf
-open http://127.0.0.1:7681/cchat/
-```
-
-`install.sh`는 `bin/ config/ launchd/`의 `@@이름@@` 자리에 설정 값을 넣어 `~/.local/bin`, `~/.config/cchat`, `~/Library/LaunchAgents`에 깔고 launchd 서비스를 (다시) 올린다.
-설치 없이 결과만 보려면 `./install.sh -c my.conf --render-only /tmp/out`.
 
 ## 밖에서 접속할 때 (주의)
 

@@ -21,6 +21,29 @@ A browser front-end (desktop and phone) for [Claude Code](https://docs.anthropic
 
 *One-minute walkthrough ([mp4](docs/demo.mp4)).*
 
+## Install
+
+Paste this into Claude Code (or any coding agent) on your Mac:
+
+```
+Clone https://github.com/efww/cchat to ~/cchat, then read ~/cchat/INSTALL.md and follow it to install cchat on this Mac.
+```
+
+It checks the requirements (macOS, Homebrew, Claude Code), installs `ttyd` and `tmux`, asks you three things (work folder, permission mode, port), installs, and opens the page.
+
+<details><summary>Manual install</summary>
+
+```sh
+brew install ttyd tmux
+git clone https://github.com/efww/cchat.git ~/cchat && cd ~/cchat
+cp cchat.conf.example my.conf     # edit: WORKDIR, PERMISSION_MODE, PORT
+./install.sh -c my.conf
+open "http://127.0.0.1:7681/cchat/?arg=1"
+```
+
+Update: `git pull && ./install.sh -c my.conf`. Uninstall and details: [INSTALL.md](INSTALL.md).
+</details>
+
 ## Features
 
 - **Session tabs**: the bottom two rows are session tabs. The top row shows the number; the bottom row shows the session label (cut off with `…` when too long).
@@ -41,21 +64,6 @@ A browser front-end (desktop and phone) for [Claude Code](https://docs.anthropic
 5. **Close the browser any time**: sessions keep running in tmux. Open the page again and everything is where you left it. Type `/exit` in a session to close its tab.
 
 On a phone, tap a tab to switch; drag with your finger to scroll, and use the key bar for Esc, Tab and arrows.
-
-## Requirements
-
-macOS, Homebrew `ttyd` and `tmux`, python3, and the Claude Code CLI (`~/.local/bin/claude`).
-
-## Install
-
-```sh
-cp cchat.conf.example my.conf     # edit values (work folder, port, permission mode, …)
-./install.sh -c my.conf
-open http://127.0.0.1:7681/cchat/
-```
-
-`install.sh` fills the `@@NAME@@` placeholders in `bin/ config/ launchd/` with your config values, installs them into `~/.local/bin`, `~/.config/cchat` and `~/Library/LaunchAgents`, and (re)starts the launchd services.
-To render without installing: `./install.sh -c my.conf --render-only /tmp/out`.
 
 ## Remote access (read this)
 
