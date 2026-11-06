@@ -1,0 +1,50 @@
+#!/bin/zsh
+# cchat: ttyd가 브라우저 연결마다 'cchat-session attach [이름]'으로 실행한다.
+#   이름은 URL의 ?arg=이름 (예: @@PUBLIC_URL@@?arg=work). 없으면 main.
+#   attach [이름] -> cchat 전용 tmux 서버(-L cchat)에서 그 이름의 대화에 붙는다(없으면 새로 만든다).
+#   --loop [id]   -> tmux 안에서 claude 실행(id를 주면 처음엔 그 대화를 이어서). /exit(정상 종료)면 대화를 닫고, 비정상 종료면 Enter=다시 시작, q=닫기.
+export PATH="@@HOME@@/.local/bin:@@BREW@@:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+export LANG="${LANG:-en_US.UTF-8}"
+export COLORTERM=truecolor
+setopt extendedglob
+WORKDIR=@@WORKDIR@@
+PERMISSION_MODE=@@PERMISSION_MODE@@
+TMUX_CMD=(@@BREW@@/tmux -L cchat -f @@HOME@@/.config/cchat/tmux.conf)
+NAME_RE='^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$'
+
+case "$1" in
+  --loop)
+    cd "$WORKDIR" || exit 1
+    # --loop <claude 세션 id>: 처음 한 번은 그 대화를 이어서 연다(설정을 다시 읽히려고 대화를 다시 띄울 때).
+    resume=()
+    [[ "$2" == [0-9a-f]##-[0-9a-f-]## ]] && resume=(--resume "$2")
+    while true; do
+      claude --permission-mode "$PERMISSION_MODE" --settings @@HOME@@/.config/cchat/claude-settings.json "${resume[@]}"
+      resume=()
+      # /exit 처럼 정상 종료(0)면 바로 이 대화를 닫는다. 비정상 종료일 때만 아래에서 물어본다.
+      (( $? == 0 )) && exit 0
+      # claude가 켜 둔 마우스·포커스·붙여넣기 보고 모드를 끈다. 안 끄면 탭 클릭·브라우저 포커스 신호가
+      # 입력에 섞여(예: ESC[I ESC[<0;50;19M q) q가 q로 안 읽혀 다시 시작돼 버렸다(2026-11-05).
+      printf '\e[?1000l\e[?1002l\e[?1003l\e[?1006l\e[?1015l\e[?1004l\e[?2004l'
+      print -P "\n%F{yellow}claude가 비정상 종료됐습니다. Enter: 다시 시작 / q 입력 후 Enter: 이 대화 닫기%f"
+      read -r answer
+      # 그래도 섞여 들어온 제어 문자열(ESC[...글자)과 공백은 지우고 본다.
+      answer=${answer//$'\e'\[[0-9;<>?]#[A-Za-z~]/}
+      answer=${answer//[[:space:][:cntrl:]]/}
+      [[ "$answer" == [qQ] ]] && exit 0
+    done
+    ;;
+  attach)
+    name="${2:-main}"
+    if [[ ! "$name" =~ $NAME_RE ]]; then
+      print "잘못된 대화 이름입니다. 영문·숫자·-·_ 로 32자 이내 (예: ?arg=work)"
+      sleep 20
+      exit 1
+    fi
+    exec "${TMUX_CMD[@]}" new-session -A -s "$name" -c "$WORKDIR" "@@HOME@@/.local/bin/cchat-session --loop"
+    ;;
+  *)
+    print "usage: cchat-session attach [name]"
+    exit 2
+    ;;
+esac

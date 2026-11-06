@@ -1,0 +1,11 @@
+#!/bin/zsh
+# cchat: 이 맥의 ttyd(127.0.0.1:@@PORT@@)를 @@TUNNEL_HOST@@의 127.0.0.1:@@TUNNEL_REMOTE_PORT@@으로 여는 역방향 SSH 통로. launchd가 유지한다.
+# 이전 연결이 비정상 종료돼 그 호스트에 남은 @@TUNNEL_REMOTE_PORT@@ 리스너(sshd 소유일 때만)를 먼저 정리한다.
+/usr/bin/ssh -o BatchMode=yes -o ConnectTimeout=10 @@TUNNEL_HOST@@ '
+  pid=$(sudo -n ss -ltnpH "sport = :@@TUNNEL_REMOTE_PORT@@" 2>/dev/null | grep -o "pid=[0-9]*" | head -1 | cut -d= -f2)
+  if [ -n "$pid" ]; then
+    case "$(ps -o comm= -p "$pid")" in sshd*) kill "$pid"; sleep 1;; esac
+  fi' || true
+exec /usr/bin/ssh -N -T -o BatchMode=yes -o ExitOnForwardFailure=yes \
+  -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=10 \
+  -R 127.0.0.1:@@TUNNEL_REMOTE_PORT@@:127.0.0.1:@@PORT@@ @@TUNNEL_HOST@@

@@ -1,0 +1,10 @@
+#!/bin/zsh
+# cchat: 매일 새벽 claude CLI를 최신으로 올린다(launchd @@LAUNCHD_PREFIX@@.update).
+# 이미 실행 중인 claude 세션은 그대로 두며, 새 버전은 claude를 다시 시작할 때 적용된다.
+export PATH="@@HOME@@/.local/bin:@@BREW@@:/usr/bin:/bin:/usr/sbin:/sbin"
+unset DISABLE_AUTOUPDATER
+before=$(readlink @@HOME@@/.local/bin/claude)
+out=$(@@HOME@@/.local/bin/claude update </dev/null 2>&1); rc=$?
+after=$(readlink @@HOME@@/.local/bin/claude)
+print -r -- "$(date '+%F %T') rc=$rc ${before:t} -> ${after:t} | ${out//$'\n'/ / }"
+exit $rc

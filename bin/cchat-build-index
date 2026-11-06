@@ -1,0 +1,576 @@
+#!/usr/bin/env python3
+"""cchat: ttyd 기본 index.html에 cchat 전용 부분을 넣어 ~/.config/cchat/index.html을 만든다.
+
+- 모바일 viewport (폰에서 글자가 작게 축소되던 문제)
+- 기기별 터미널 색: PC=라이트, 폰(터치 또는 좁은 화면)=다크
+  claude는 16색 전용 테마(light-ansi)로 돌고, 16색 팔레트만 기기별로 다르다.
+  폰 팔레트는 light-ansi 의미(black=글자, white=옅은 바탕)를 뒤집어 다크로 보이게 한다.
+- 폰 하단 키 버튼: Esc, Shift+Tab, Tab, 방향키, Ctrl+C, Enter
+- 폰 손가락 드래그 → 마우스 휠 신호(위 대화로 스크롤)
+
+ttyd를 업그레이드(brew upgrade ttyd)한 뒤에는 이 스크립트를 다시 실행하고
+launchctl kickstart -k gui/$(id -u)/@@LAUNCHD_PREFIX@@.ttyd 로 ttyd를 다시 띄운다.
+"""
+import json
+import subprocess
+import time
+import urllib.request
+from pathlib import Path
+
+TTYD = "@@BREW@@/ttyd"
+TEMP_PORT = 7699
+OUT = Path("@@HOME@@/.config/cchat/index.html")
+
+LIGHT = {
+    "background": "#fbfbfd", "foreground": "#1f2328", "cursor": "#1f2328", "cursorAccent": "#fbfbfd",
+    "selectionBackground": "#b4d5fe",
+    "black": "#24292f", "red": "#cf222e", "green": "#116329", "yellow": "#4d2d00",
+    "blue": "#0969da", "magenta": "#8250df", "cyan": "#1b7c83", "white": "#e6e8eb",
+    "brightBlack": "#6e7781", "brightRed": "#a40e26", "brightGreen": "#1a7f37", "brightYellow": "#633c01",
+    "brightBlue": "#218bff", "brightMagenta": "#a475f9", "brightCyan": "#3192aa", "brightWhite": "#f6f8fa",
+}
+DARK = {
+    "background": "#0d1117", "foreground": "#e6edf3", "cursor": "#e6edf3", "cursorAccent": "#0d1117",
+    "selectionBackground": "#264f78",
+    "black": "#e6edf3", "red": "#ff7b72", "green": "#3fb950", "yellow": "#d29922",
+    "blue": "#58a6ff", "magenta": "#bc8cff", "cyan": "#39c5cf", "white": "#2d333b",
+    "brightBlack": "#8b949e", "brightRed": "#ffa198", "brightGreen": "#56d364", "brightYellow": "#e3b341",
+    "brightBlue": "#79c0ff", "brightMagenta": "#d2a8ff", "brightCyan": "#56d4dd", "brightWhite": "#22272e",
+}
+
+
+def dark_extended_ansi() -> list:
+    """256색 16~255번을 다크용으로. claude(light-ansi)는 코드·도구 출력에 회색 단계(232~255)와
+    16(검정)/231(흰색)을 밝은 바탕 기준으로 쓴다. 다크에서는 밝기를 뒤집되, 중간 회색은
+    조금 더 밝게(지수 0.75) 올려 검은 바탕에서도 읽히게 한다. 나머지 색상 큐브는 그대로."""
+    def hexc(v):
+        return "#%02x%02x%02x" % v
+    levels = [0, 95, 135, 175, 215, 255]
+    out = []
+    for i in range(16, 256):
+        if i == 16:
+            out.append(DARK["foreground"])
+        elif i == 231:
+            out.append(DARK["background"])
+        elif i < 232:
+            n = i - 16
+            out.append(hexc((levels[n // 36], levels[(n // 6) % 6], levels[n % 6])))
+        else:
+            v = 8 + 10 * (i - 232)
+            inv = 1 - (v - 8) / 230
+            g = round(13 + 225 * inv ** 0.75)
+            out.append(hexc((g, g, g)))
+    return out
+
+
+DARK["extendedAnsi"] = dark_extended_ansi()
+KEYS =[["Esc", "\u001b"], ["⇧Tab", "\u001b[Z"], ["Tab", "\t"], ["↑", "\u001b[A"],
+        ["↓", "\u001b[B"], ["←", "\u001b[D"], ["→", "\u001b[C"], ["^C", "\u0003"], ["⏎", "\r"]]
+
+VIEWPORT = ('<meta name="viewport" content="width=device-width, initial-scale=1, '
+            'viewport-fit=cover, interactive-widget=resizes-content">')
+
+STYLE = """<style id="cchat-style">
+html,body{background:var(--cchat-bg,#fbfbfd)}
+#cchat-keys{display:none}
+html[data-cchat-device=mobile] #terminal-container{height:calc(100% - 48px - env(safe-area-inset-bottom));touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+html[data-cchat-device=mobile] #cchat-keys{display:flex;position:fixed;left:0;right:0;bottom:0;gap:4px;
+  height:calc(48px + env(safe-area-inset-bottom));padding:5px 4px calc(5px + env(safe-area-inset-bottom));
+  box-sizing:border-box;background:#161b22;border-top:1px solid #30363d;z-index:10;
+  user-select:none;-webkit-user-select:none;touch-action:manipulation}
+#cchat-keys .k{flex:1;display:flex;align-items:center;justify-content:center;border-radius:6px;
+  background:#21262d;color:#e6edf3;border:1px solid #30363d;font:600 14px/1 -apple-system,system-ui,sans-serif}
+#cchat-keys .k:active{background:#388bfd;color:#fff}
+</style>"""
+
+SCRIPT = """<script id="cchat-script">
+(() => {
+  const LIGHT = __LIGHT__, DARK = __DARK__, KEYS = __KEYS__, BUILD = '__BUILD__';
+  const mq = (q) => { try { return matchMedia(q).matches; } catch (_) { return false; } };
+  const coarse = mq('(pointer: coarse)');
+  const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '') || coarse
+    || mq('(hover: none)') || Math.min(screen.width || 9999, innerWidth || 9999) <= 600;
+  const theme = mobile ? DARK : LIGHT;
+  const root = document.documentElement;
+  root.dataset.cchatDevice = mobile ? 'mobile' : 'desktop';
+  root.style.setProperty('--cchat-bg', theme.background);
+
+  // 판별 결과를 ttyd 로그에 남긴다(404 경로 /cchat/__cchat/...). 실제 기기 확인용.
+  const beacon = (stage) => {
+    try {
+      const t = window.term && window.term.options && window.term.options.theme;
+      const bg = ((t && t.background) || 'none').replace('#', '');
+      fetch(`./__cchat/${stage}/${BUILD}/${mobile ? 'mobile' : 'desktop'}/${bg}/${innerWidth}x${innerHeight}/${coarse ? 'coarse' : 'fine'}`,
+        { cache: 'no-store' }).catch(() => {});
+    } catch (_) {}
+  };
+
+  // 연결이 끊기면 자동으로 다시 붙는다.
+  // ttyd는 정상 종료(코드 1000)나 소켓 오류 뒤에 "Press ⏎ to Reconnect"만 띄우고, 실제 키보드 Enter(onKey의 domEvent)만 받는다.
+  // 폰 화면 키보드 Enter는 key가 'Enter'로 안 오고, 키 바 버튼은 term.input(onData)이라 그 감지에 걸리지 않아 새로고침밖에 없었다.
+  // 그래서 소켓을 추적하다가 끊기면 xterm의 onKey에 Enter를 직접 흘려 ttyd 재연결을 부르고, 6초 안에 안 붙으면 새로고침한다.
+  let sock = null, tries = 0, openedAt = 0, autoTimer = null, fallback = null;
+  // 지금 보는 대화: tmux가 터미널 제목을 'cchat:<대화>'로 보낸다(config/tmux.conf set-titles).
+  // ttyd는 접속 주소(?arg=)를 페이지를 열 때 한 번만 정해서, 탭으로 대화를 바꾼 뒤 다시 붙으면
+  // 주소창의 대화로 돌아가 버렸다 → 다시 붙을 때 소켓 주소의 arg를 지금 대화로 바꾸고, 주소창도 맞춰 둔다.
+  let curSession = null;
+  const withSession = (url) => {
+    if (!curSession) return url;
+    try { const u = new URL(url, location.href); u.searchParams.set('arg', curSession); return u.toString(); } catch (_) { return url; }
+  };
+  const installTitle = (term) => {
+    if (term.__cchatTitle || !term.onTitleChange) return;
+    term.__cchatTitle = true;
+    term.onTitleChange((t) => {
+      const m = /^cchat:([A-Za-z0-9][A-Za-z0-9_-]{0,31})$/.exec(t || '');
+      if (!m) return;
+      curSession = m[1];
+      try { history.replaceState(history.state, '', withSession(location.href)); } catch (_) {}
+      document.title = `cchat ${curSession === 'main' ? '0' : curSession}`;
+    });
+  };
+  const NativeWS = window.WebSocket;
+  const PatchedWS = function (...args) {
+    if (typeof args[0] === 'string') args[0] = withSession(args[0]);
+    const ws = new NativeWS(...args);
+    sock = ws;
+    ws.addEventListener('open', () => { openedAt = Date.now(); clearTimeout(fallback); });
+    ws.addEventListener('close', () => {
+      if (sock !== ws) return;
+      tries = Date.now() - openedAt > 10000 ? 1 : tries + 1;  // 금방 또 끊기면 간격을 늘리고 5번에서 멈춤
+      clearTimeout(autoTimer);
+      if (tries <= 5 && document.visibilityState === 'visible') autoTimer = setTimeout(() => reconnect('auto'), 1500 * tries);
+    });
+    return ws;
+  };
+  PatchedWS.prototype = NativeWS.prototype;
+  Object.assign(PatchedWS, { CONNECTING: 0, OPEN: 1, CLOSING: 2, CLOSED: 3 });
+  window.WebSocket = PatchedWS;
+  const isDown = () => !!sock && sock.readyState >= 2;
+  const reconnect = (why) => {
+    if (!isDown()) return;
+    clearTimeout(autoTimer); clearTimeout(fallback);
+    beacon(`reconnect-${why}-${tries}`);
+    try {
+      const em = window.term && window.term._core && window.term._core._onKey;
+      if (em && em.fire) em.fire({ key: '\\r', domEvent: new KeyboardEvent('keydown', { key: 'Enter' }) });
+    } catch (_) {}
+    fallback = setTimeout(() => { if (isDown()) location.reload(); }, 6000);
+  };
+  const onBack = () => {
+    if (document.visibilityState === 'visible' && isDown() && tries <= 5) reconnect('visible');
+  };
+  document.addEventListener('visibilitychange', onBack);
+  window.addEventListener('pageshow', onBack);
+  window.addEventListener('online', onBack);
+  window.addEventListener('focus', onBack);
+
+  const buildKeys = () => {
+    const bar = document.createElement('div');
+    bar.id = 'cchat-keys';
+    for (const [label, seq] of KEYS) {
+      const key = document.createElement('div');
+      key.className = 'k';
+      key.textContent = label;
+      key.setAttribute('role', 'button');
+      key.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        if (isDown()) { tries = 0; reconnect('button'); return; }  // 끊겨 있으면 어떤 버튼이든 재연결
+        if (window.term) window.term.input(seq, true);
+      });
+      key.addEventListener('mousedown', (e) => e.preventDefault());
+      key.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+      bar.appendChild(key);
+    }
+    document.body.appendChild(bar);
+    if (window.term && typeof window.term.fit === 'function') window.term.fit();
+  };
+
+  // 폰: 손가락 위아래 드래그를 마우스 휠 신호(SGR)로 바꿔 보낸다.
+  // xterm.js는 터치를 휠로 바꿔 주지 않아서 폰에서는 위 대화로 스크롤할 수 없었다.
+  // 손가락을 아래로 끌면 휠 위(64) = 이전 대화, 위로 끌면 휠 아래(65). claude가 전체화면(마우스 사용)이라 tmux가 휠을 claude에 그대로 넘긴다.
+  const STEP = 0.8;   // 손가락이 글자 줄 STEP개만큼 움직일 때마다 휠 한 칸(claude 전체화면은 한 칸에 약 1줄)
+  const FIRST = 0.3;  // 드래그 첫 칸은 STEP의 이 비율만 움직여도 보낸다
+  const installTouchScroll = () => {
+    const el = document.getElementById('terminal-container');
+    if (!el || el.dataset.cchatTouch) return;
+    el.dataset.cchatTouch = '1';
+    // 브라우저는 touchmove를 손가락이 ~16px 움직인 뒤에야 보낸다(시작이 굼뜬 원인).
+    // pointermove는 2px부터 오므로 이동 계산은 포인터 이벤트로 한다(touch-action:none 필요).
+    const STATUS_ROWS = 2;  // tmux 상태줄(대화 탭) 줄 수 = config/tmux.conf의 status
+    let pid = null, lastY = null, acc = 0, moves = 0, wheels = 0, reports = 0, downX = 0, downY = 0;
+    // 손가락 위치 → 터미널 칸(열,줄). 여백을 뺀 실제 글자 영역(.xterm-screen) 기준.
+    const cellAt = (x, y) => {
+      const term = window.term;
+      if (!term || !term.element) return null;
+      const r = (term.element.querySelector('.xterm-screen') || term.element).getBoundingClientRect();
+      const col = Math.min(term.cols, Math.max(1, Math.floor((x - r.left) / (r.width / Math.max(1, term.cols))) + 1));
+      const row = Math.min(term.rows, Math.max(1, Math.floor((y - r.top) / (r.height / Math.max(1, term.rows))) + 1));
+      return { col, row, last: row > term.rows - STATUS_ROWS && y >= r.top };
+    };
+    const onStatusRow = (y) => { const c = cellAt(0, y); return !!(c && c.last); };
+    // claude 입력칸(─── 가로선 두 줄 사이, 선 포함)인가. 키보드는 여기를 탭할 때만 올린다.
+    // 가로선을 못 찾으면(claude 화면이 아닐 때) true → 예전처럼 어디를 눌러도 키보드.
+    const inInputBox = (row) => {
+      const term = window.term;
+      if (!term || !term.buffer) return true;
+      const buf = term.buffer.active, base = buf.viewportY;
+      const isRule = (r) => {
+        const line = buf.getLine(base + r - 1);
+        const t = line ? line.translateToString(true).trim() : '';
+        return t.length >= 10 && /^─+$/.test(t);
+      };
+      const rules = [];
+      for (let r = term.rows - STATUS_ROWS; r >= 1 && rules.length < 2; r--) if (isRule(r)) rules.push(r);
+      if (rules.length < 2) return true;
+      return row >= rules[1] && row <= rules[0];
+    };
+    // 길게 누르기(LONG ms, 손가락 거의 안 움직임) = 선택 모드: 그 자리에서 마우스 누름을 보내고,
+    // 끄는 동안 마우스 드래그, 떼면 마우스 놓기를 보낸다. claude가 PC 드래그와 똑같이 선택하고
+    // OSC 52로 복사 신호를 보내면 아래 installOsc52가 클립보드에 넣는다.
+    const LONG = 450, SLOP = 10;
+    let lpTimer = null, selecting = false, selCell = null, swallowTouchEnd = false;
+    // 선택 모드 중에는 키보드가 필요 없다: 누르기 시작할 때 키보드가 내려가 있었으면 선택 모드 동안과
+    // 뗀 뒤 1.5초까지 입력칸 포커스가 오거나 화면이 줄면(=키보드) 포커스를 뺀다(상태줄 탭과 같은 원인).
+    let downKbUp = false, downH = 0, selGuardUntil = 0, selHits = [], selReports = 0;
+    const selGuard = (why) => {
+      if (downKbUp || Date.now() > selGuardUntil) return;
+      const t = ta();
+      if (document.activeElement === t || vh() < downH - 80) { selHits.push(why); if (t) t.blur(); }
+    };
+    const mouse = (b, c, up) => window.term && window.term.input(`\u001b[<${b};${c.col};${c.row}${up ? 'm' : 'M'}`, true);
+    const cancelLong = () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } };
+    el.addEventListener('contextmenu', (e) => e.preventDefault(), { capture: true });
+    el.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'touch') return;
+      if (pid !== null) { pid = null; lastY = null; cancelLong(); return; }  // 두 손가락이면 스크롤 안 함
+      pid = e.pointerId; lastY = e.clientY; acc = 0; moves = 0; wheels = 0;
+      downX = e.clientX; downY = e.clientY;
+      selecting = false; cancelLong();
+      if (onStatusRow(e.clientY)) return;
+      downKbUp = kbUp(); downH = vh(); selGuardUntil = 0;  // 새로 누르면 이전 탭의 키보드 가드는 끝
+      const dc = cellAt(downX, downY);
+      if (!downKbUp && dc && !inInputBox(dc.row) && ta() && document.activeElement === ta()) ta().blur();
+      const id = e.pointerId;
+      lpTimer = setTimeout(() => {
+        lpTimer = null;
+        if (pid !== id || wheels) return;
+        const c = cellAt(downX, downY);
+        if (!c || c.last) return;
+        selecting = true; selCell = c; selHits = [];
+        selGuardUntil = Infinity; selGuard('s');
+        mouse(0, c, false);
+        if (navigator.vibrate) navigator.vibrate(15);
+        toast('선택 모드: 끌어서 선택, 떼면 복사');
+      }, LONG);
+    }, { passive: true, capture: true });
+    const end = (e) => {
+      if (e.pointerId !== pid) return;
+      pid = null; lastY = null; cancelLong();
+      if (selecting) {
+        selecting = false; swallowTouchEnd = true;
+        selGuardUntil = Date.now() + 1500;
+        for (const ms of [50, 300, 800]) setTimeout(() => selGuard('t' + ms), ms);
+        setTimeout(() => { if (selReports++ < 5) beacon(`lsel-${downKbUp ? 1 : 0}-${selHits.join('.') || 'none'}-${Math.round(downH)}-${Math.round(vh())}`); }, 1600);
+        const c = cellAt(e.clientX, e.clientY) || selCell;
+        mouse(0, c.last ? selCell : c, true);
+        return;
+      }
+      // 실제 폰에서 드래그가 잡혔는지 ttyd 로그에 남긴다(처음 5번만): touch/움직임수/보낸휠수
+      if (moves && reports++ < 5) beacon(`touch-${moves}-${wheels}`);
+      // 맨 아래 상태줄(대화 탭, STATUS_ROWS줄)을 톡 치면 마우스 클릭으로 보낸다 → 대화 번호를 눌러 그 대화로 전환.
+      const term = window.term;
+      if (e.type !== 'pointerup' || wheels || !term) return;
+      if (Math.abs(e.clientX - downX) > 12 || Math.abs(e.clientY - downY) > 12) return;
+      const c = cellAt(downX, downY);
+      if (!c) return;
+      // 대화 화면 탭(키보드 내려간 상태, 입력칸 밖): 키보드 없이 클릭만 보낸다(Jump to bottom 등).
+      if (!c.last) {
+        if (downKbUp || inInputBox(c.row)) return;  // 키보드가 이미 올라와 있거나 입력칸이면 원래대로
+        swallowTouchEnd = true;
+        selHits = []; selGuardUntil = Date.now() + 1500; selGuard('c');
+        for (const ms of [50, 300, 800]) setTimeout(() => selGuard('t' + ms), ms);
+        mouse(0, c, false); mouse(0, c, true);
+        return;
+      }
+      const { col, row } = c;
+      term.input(`\\u001b[<0;${col};${row}M\\u001b[<0;${col};${row}m`, true);
+    };
+    el.addEventListener('pointerup', end, { passive: true, capture: true });
+    el.addEventListener('pointercancel', end, { passive: true, capture: true });
+    // 상태줄(맨 아래 STATUS_ROWS줄)을 누를 때는 터치 기본 동작을 막아 입력칸에 포커스가 가지 않게 한다
+    // → 키보드가 내려가 있으면 그대로 둔다. 클릭은 위 pointerup이 tmux로 보낸다.
+    for (const type of ['touchstart', 'touchend']) {
+      el.addEventListener(type, (e) => {
+        const t = e.changedTouches[0];
+        if (type === 'touchend' && swallowTouchEnd) {
+          swallowTouchEnd = false;
+          if (e.cancelable) e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+        if (e.touches.length > 1 || !t || !onStatusRow(t.clientY)) return;
+        if (e.cancelable) e.preventDefault();
+        e.stopPropagation();
+      }, { passive: false, capture: true });
+    }
+    // 위로 막아도 실제 폰에서는 키보드가 올라오는 경우가 있어서(2026-11-05 확인), 상태줄 탭 직후
+    // 입력칸에 포커스가 오거나 화면 높이가 줄면(=키보드가 올라옴) 포커스를 빼서 키보드를 내린다.
+    // 탭 전부터 키보드가 올라와 있었으면 건드리지 않는다.
+    // 폰은 키보드를 내려도 입력칸 포커스는 남아 있어서(stap-1-...-800-461), 키보드 상태는 화면 높이로 판단한다.
+    let stap = null, stapReports = 0, maxH = 0;
+    const vh = () => (window.visualViewport ? window.visualViewport.height : innerHeight);
+    const kbUp = () => { const h = vh(); maxH = Math.max(maxH, h); return h < maxH - 80; };
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', kbUp);
+    kbUp();
+    const ta = () => (window.term && window.term.textarea) || document.querySelector('.xterm-helper-textarea');
+    el.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'touch' || !onStatusRow(e.clientY)) { stap = null; return; }
+      const up = kbUp(), t = ta(), foc = document.activeElement === t;
+      stap = { t: Date.now(), h: vh(), foc: up, hadFocus: foc, hits: [] };
+      // 키보드가 내려가 있는데 포커스만 남아 있으면 지금 빼 둔다(탭이 키보드를 다시 부르지 않게).
+      if (!up && foc && t) { t.blur(); stap.hits.push('d'); }
+    }, { passive: true, capture: true });
+    const guard = (why) => {
+      if (!stap || stap.foc || Date.now() - stap.t > 1500) return;
+      const t = ta();
+      if (document.activeElement === t || vh() < stap.h - 80) { stap.hits.push(why); if (t) t.blur(); }
+    };
+    document.addEventListener('focusin', () => { guard('f'); selGuard('f'); }, true);
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', () => { guard('r'); selGuard('r'); });
+    el.addEventListener('pointerup', () => {
+      if (!stap) return;
+      const s0 = stap;
+      for (const ms of [50, 200, 500, 1000]) setTimeout(() => guard('t' + ms), ms);
+      setTimeout(() => { if (stapReports++ < 5) beacon(`stap-${s0.foc ? 1 : 0}${s0.hadFocus ? 1 : 0}-${s0.hits.join('.') || 'none'}-${Math.round(s0.h)}-${Math.round(vh())}`); }, 1300);
+    }, { passive: true, capture: true });
+    // xterm.js 자체 터치 처리는 막는다(스크롤은 아래 pointermove가 맡음).
+    el.addEventListener('touchmove', (e) => {
+      if (e.touches.length !== 1) return;
+      if (e.cancelable) e.preventDefault();
+      e.stopPropagation();
+    }, { passive: false, capture: true });
+    el.addEventListener('pointermove', (e) => {
+      const term = window.term;
+      if (e.pointerId !== pid || lastY === null || !term) return;
+      moves++;
+      if (selecting) {
+        const c = cellAt(e.clientX, e.clientY);
+        if (c && !c.last && (c.col !== selCell.col || c.row !== selCell.row)) { selCell = c; mouse(32, c, false); }
+        return;
+      }
+      if (lpTimer && (Math.abs(e.clientX - downX) > SLOP || Math.abs(e.clientY - downY) > SLOP)) cancelLong();
+      if (lpTimer) return;  // 길게 누르기 판정 중에는 스크롤하지 않는다(손떨림으로 화면이 움직이지 않게)
+      const t = e;
+      const r = (term.element || el).getBoundingClientRect();
+      const ch = r.height / Math.max(1, term.rows), cw = r.width / Math.max(1, term.cols);
+      const col = Math.min(term.cols, Math.max(1, Math.floor((t.clientX - r.left) / cw) + 1));
+      const row = Math.min(term.rows, Math.max(1, Math.floor((t.clientY - r.top) / ch) + 1));
+      acc += t.clientY - lastY;
+      lastY = t.clientY;
+      const unit = ch * STEP;
+      let seq = '';
+      // 드래그 첫 칸은 FIRST만큼만 움직여도 바로 보낸다(시작 반응이 늦지 않게).
+      for (let need = wheels ? unit : unit * FIRST; Math.abs(acc) >= need; need = unit) {
+        const up = acc > 0;
+        seq += `\\u001b[<${up ? 64 : 65};${col};${row}M`;
+        acc += up ? -need : need;
+        wheels++;
+      }
+      if (seq) term.input(seq, true);
+    }, { passive: true, capture: true });
+  };
+
+  // 드래그 복사: claude(전체화면)는 선택한 글을 OSC 52(ESC]52;c;base64)로 보내고 tmux가 그대로 넘겨 주는데,
+  // ttyd의 xterm.js에는 이를 받는 처리가 없어서 복사가 안 됐다(2026-11-05). 받아서 브라우저 클립보드에 넣는다.
+  const copyText = (text) => {
+    const done = () => toast('복사됨');
+    const fallback = () => {
+      const t = document.createElement('textarea');
+      t.value = text; t.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+      document.body.appendChild(t); t.select();
+      try { if (document.execCommand('copy')) done(); } catch (e) {}
+      t.remove();
+      if (window.term) window.term.focus();
+    };
+    // 폰(특히 iOS)은 손가락을 뗀 뒤 비동기로 오는 복사를 막을 수 있다 → 그때는 '눌러서 복사' 버튼을 띄운다.
+    const ask = () => button('눌러서 복사', () => navigator.clipboard.writeText(text).then(done, () => toast('복사 실패')));
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, mobile ? ask : fallback);
+    else if (mobile) ask();
+    else fallback();
+  };
+  const button = (label, onTap) => {
+    let b = document.getElementById('cchat-copybtn');
+    if (!b) {
+      b = document.createElement('button'); b.id = 'cchat-copybtn';
+      b.style.cssText = 'position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:10000;padding:8px 16px;'
+        + 'border:0;border-radius:8px;background:#2f6fde;color:#fff;font:15px sans-serif';
+      document.body.appendChild(b);
+    }
+    b.textContent = label; b.style.display = 'block';
+    b.onclick = (e) => { e.preventDefault(); b.style.display = 'none'; onTap(); };
+    clearTimeout(b._t); b._t = setTimeout(() => { b.style.display = 'none'; }, 6000);
+  };
+  const toast = (msg) => {
+    let el = document.getElementById('cchat-toast');
+    if (!el) {
+      el = document.createElement('div'); el.id = 'cchat-toast';
+      el.style.cssText = 'position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:9999;padding:4px 12px;'
+        + 'border-radius:6px;background:rgba(40,40,40,.85);color:#fff;font:13px sans-serif;pointer-events:none;transition:opacity .3s';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg; el.style.opacity = '1';
+    clearTimeout(el._t); el._t = setTimeout(() => { el.style.opacity = '0'; }, 1200);
+  };
+  const installOsc52 = (term) => {
+    if (term.__cchatOsc52 || !term.parser) return;
+    term.__cchatOsc52 = true;
+    term.parser.registerOscHandler(52, (data) => {
+      const i = data.indexOf(';');
+      const b64 = i < 0 ? data : data.slice(i + 1);
+      if (!b64 || b64 === '?') return true;
+      try {
+        const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+        copyText(new TextDecoder().decode(bytes));
+      } catch (e) {}
+      return true;
+    });
+  };
+
+  // PC 대화 탭 단축키: Alt(Option)+숫자 = 그 번호 대화, Alt+←/→ = 이전/다음 대화.
+  // 맥 Option+숫자는 ¡ 같은 글자가 돼 버리므로 e.code로 잡아 tmux의 M-숫자 / M-←→ 키로 보낸다(tmux.conf가 탭 이동으로 묶음).
+  if (!mobile) {
+    window.addEventListener('keydown', (e) => {
+      // Ctrl+V: 터미널로 ^V를 보내면 claude가 ttyd를 돌리는 맥의 클립보드를 읽어 붙인다. 키는 막고(전파 중단)
+      // 브라우저 기본 붙여넣기만 일어나게 해서 PC 클립보드가 들어가게 한다(preventDefault는 하지 않는다).
+      if (e.ctrlKey && !e.altKey && !e.metaKey && e.code === 'KeyV') { e.stopImmediatePropagation(); return; }
+      if (!e.altKey || e.ctrlKey || e.metaKey || !window.term) return;
+      let seq = null;
+      const m = /^Digit([0-9])$/.exec(e.code);
+      if (m) seq = '\u001b' + m[1];
+      else if (e.code === 'ArrowLeft') seq = '\u001b[1;3D';
+      else if (e.code === 'ArrowRight') seq = '\u001b[1;3C';
+      if (!seq) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      window.term.input(seq, true);
+    }, true);
+  }
+
+  // 작업 중 탭 깜빡임: cchat-tabs가 작업 중 탭의 빈칸 글자색을 BUSY_MARK(256색 123번)로 칠해 둔다(빈칸이라 안 보임).
+  // 1초마다 맨 아래 2줄(상태줄)만 읽어 그 탭의 칸 범위를 찾고, 그 위에 반투명 판을 얹어 2초마다 판을 담은 층 전체의 진하기를 딱 바꾼다(모든 탭 같은 박자).
+  // 터미널 색·글자 그림은 건드리지 않고(다시 그리기 없음), 판은 입력을 통과시킨다(pointer-events:none).
+  const BUSY_MARK = 123, BUSY_CYCLE = 4000;
+  let busyKey = '';
+  const busyLayer = () => {
+    let el = document.getElementById('cchat-busy');
+    if (!el) {
+      const st = document.createElement('style');
+      st.textContent = '#cchat-busy{position:fixed;inset:0;pointer-events:none;z-index:5}'
+        + '#cchat-busy div{position:fixed;pointer-events:none;background:' + (mobile ? 'rgba(255,255,255,.14)' : 'rgba(0,0,0,.13)')
+        + '}';
+      document.head.appendChild(st);
+      el = document.createElement('div');
+      el.id = 'cchat-busy';
+      document.body.appendChild(el);
+    }
+    return el;
+  };
+  const scanBusy = () => {
+    const term = window.term;
+    if (!term || !term.buffer || document.hidden) return;
+    const buf = term.buffer.active, rows = term.rows, cols = term.cols;
+    const spans = [];
+    for (const y of [rows - 2, rows - 1]) {
+      const line = buf.getLine(buf.viewportY + y);
+      if (!line) continue;
+      let x = 0;
+      while (x < cols) {
+        const c = line.getCell(x);
+        if (c && c.isFgPalette() && c.getFgColor() === BUSY_MARK) {
+          // 같은 바탕색이 이어지는 데까지가 그 탭(탭 사이는 바탕색 없는 한 칸)
+          const bg = c.getBgColor();
+          let a = x, b = x;
+          while (a > 0) { const p = line.getCell(a - 1); if (!p || p.getBgColor() !== bg || p.isBgDefault()) break; a--; }
+          while (b < cols - 1) { const n = line.getCell(b + 1); if (!n || n.getBgColor() !== bg || n.isBgDefault()) break; b++; }
+          spans.push([y, a, b]);
+          x = b + 1;
+        } else x++;
+      }
+    }
+    const scr = term.element && term.element.querySelector('.xterm-screen');
+    const r = scr ? scr.getBoundingClientRect() : null;
+    const key = r ? `${spans.join('|')}@${r.left},${r.top},${r.width},${r.height},${cols},${rows}` : '';
+    if (key === busyKey) return;
+    busyKey = key;
+    const el = busyLayer();
+    el.textContent = '';
+    if (!r || !spans.length) return;
+    const cw = r.width / cols, ch = r.height / rows;
+    for (const [y, a, b] of spans) {
+      const d = document.createElement('div');
+      d.style.cssText = `left:${r.left + a * cw}px;top:${r.top + y * ch}px;width:${(b - a + 1) * cw}px;height:${ch}px`;
+      el.appendChild(d);
+    }
+  };
+  setInterval(scanBusy, 1000);
+  // 깜빡임은 판 하나하나가 아니라 판을 담은 층 전체를 한 번에 켜고 끈다 → 여러 탭이 언제 시작했든 항상 같은 박자.
+  // 박자는 시계 기준(2초 평소, 2초 짙게)이라 판을 새로 그려도 어긋나지 않는다.
+  setInterval(() => {
+    const el = document.getElementById('cchat-busy');
+    if (el) el.style.opacity = Math.floor(Date.now() / (BUSY_CYCLE / 2)) % 2 ? '1' : '0';
+  }, 100);
+
+  // ttyd가 터미널을 새로 만들거나 설정을 덮어써도 0.5초 안에 기기별 색으로 되돌린다.
+  const apply = () => {
+    const term = window.term;
+    if (!term || !term.options) return;
+    installOsc52(term);
+    installTitle(term);
+    const cur = term.options.theme || {};
+    if (cur.background !== theme.background || cur.black !== theme.black) term.options.theme = theme;
+    if (mobile && document.body && !document.getElementById('cchat-keys')) buildKeys();
+    if (mobile) installTouchScroll();
+  };
+  setInterval(apply, 500);
+  apply();
+  setTimeout(() => beacon('t5'), 5000);
+})();
+</script>"""
+
+
+def fetch_base_index() -> str:
+    proc = subprocess.Popen([TTYD, "-i", "lo0", "-p", str(TEMP_PORT), "true"],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        for _ in range(50):
+            try:
+                req = urllib.request.Request(f"http://127.0.0.1:{TEMP_PORT}/",
+                                             headers={"Accept-Encoding": "identity"})
+                with urllib.request.urlopen(req, timeout=2) as res:
+                    return res.read().decode("utf-8")
+            except OSError:
+                time.sleep(0.1)
+        raise SystemExit("temporary ttyd did not respond")
+    finally:
+        proc.terminate()
+        proc.wait(timeout=5)
+
+
+def main() -> None:
+    html = fetch_base_index()
+    charset = '<meta charset="UTF-8">'
+    if html.count(charset) != 1 or html.count("</head>") != 1 or 'name="viewport"' in html:
+        raise SystemExit("unexpected ttyd index layout; inspect before injecting")
+    script = (SCRIPT.replace("__LIGHT__", json.dumps(LIGHT))
+              .replace("__DARK__", json.dumps(DARK))
+              .replace("__KEYS__", json.dumps(KEYS))
+              .replace("__BUILD__", time.strftime("%m%d%H%M")))
+    html = html.replace(charset, f"{charset}\n<!-- cchat: built by ~/.local/bin/cchat-build-index -->\n{VIEWPORT}", 1)
+    html = html.replace("</head>", f"{STYLE}\n{script}\n</head>", 1)
+    OUT.write_text(html, encoding="utf-8")
+    print(f"wrote {OUT} ({len(html)} chars)")
+
+
+if __name__ == "__main__":
+    main()

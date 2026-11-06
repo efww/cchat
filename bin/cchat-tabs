@@ -1,0 +1,311 @@
+#!/usr/bin/python3 -I
+"""cchat 상태줄 대화 탭(config/tmux.conf의 status-left가 #()로 부른다).
+
+  cchat-tabs render <client> <width> <지금대화> "<이름[+] 이름[+] ...>" <gen> [text|pad]
+      맨 아래 줄 전체를 대화 탭으로 그린다. 이름 뒤 +done은 답이 끝났는데 안 본 대화(녹색), +ask는 허락을 기다리는 대화(주황), +busy는 작업 중(깜빡임). 값은 세션 옵션 @unread.
+      다 들어가면 줄 폭을 나눠 쓰고, 넘치면 탭은 최소폭(이름+양옆 한 칸)으로 줄고 양 끝에 ◀ ▶.
+      ◀ ▶는 보이는 범위만 민다(대화는 안 바뀜). 범위는 클라이언트별로 ~/.cache/cchat-tabs/ 에 둔다.
+      <gen>은 화면 갱신용 숫자(범위를 밀 때 올려서 tmux가 다시 그리게 한다).
+      상태줄이 2줄이라 탭 하나가 두 줄 높이다: text = 위 줄(번호·화살표, 왼쪽 정렬), pad = 아래 줄(대화 이름표).
+      이름표는 claude 상태줄 스크립트(~/.claude/statusline-command.sh)가 ~/.cache/cchat-tablabel/<세션>에 남긴 것,
+      없으면 claude가 붙인 대화 제목(pane_title).
+      탭 폭보다 길면 앞에서부터 들어가는 만큼 넣고 탭 마지막 칸을 …로 끝낸다(한글은 두 칸으로 센다).
+  cchat-tabs click <client> <_prev|_next>
+      ◀ ▶ 클릭 처리(MouseDown1Status 바인딩).
+  cchat-tabs go <client> <prev|next|번호>
+      PC 단축키(Alt+←/→, Alt+숫자): 탭 순서로 이전/다음 대화(끝에서 돌아감), 또는 그 번호 대화(0=main).
+"""
+import os
+import subprocess
+import sys
+import unicodedata
+
+TMUX = ["@@BREW@@/tmux", "-L", "cchat"]
+STATE = os.path.expanduser("~/.cache/cchat-tabs")
+GAP = 1
+ARROW_W = 3  # " ◀ "
+
+CUR = "#[bg=black,fg=brightwhite,bold]"  # 지금 보는 탭: PC는 검정(폰 다크 테마에선 black이 밝은색으로 뒤집혀 흰 탭)
+DONE = "#[bg=green,fg=brightwhite,bold]"
+ASK = "#[bg=colour208,fg=brightwhite,bold]"
+OTHER = "#[bg=white,fg=black]"
+# 작업 중 탭: 겉모습은 OTHER와 같고, 빈칸의 글자색만 표시용 색 번호(BUSY_MARK)로 칠한다(빈칸이라 안 보임).
+# 브라우저(cchat-build-index의 installBusyBlink)가 맨 아래 2줄에서 이 색의 빈칸을 찾아 그 탭 위에 깜빡이는 판을 얹는다.
+BUSY_MARK = 123
+ARROW_ON = "#[bg=white,fg=black,bold]"
+ARROW_OFF = "#[bg=white,fg=brightblack]"
+PLAIN = "#[default]"
+
+
+def state_path(client):
+    return os.path.join(STATE, client.strip("/").replace("/", "_") or "none")
+
+
+def read_ofs(client):
+    try:
+        with open(state_path(client)) as f:
+            return int(f.read().strip())
+    except (OSError, ValueError):
+        return None
+
+
+def write_ofs(client, ofs):
+    os.makedirs(STATE, exist_ok=True)
+    with open(state_path(client), "w") as f:
+        f.write(str(ofs))
+
+
+# 기본 대화 main은 탭에 0으로 보이고 맨 앞에 온다(세션 이름은 main 그대로: ?arg 없이 접속하면 main).
+LABELS = {"main": "0"}
+
+
+def label(name):
+    return LABELS.get(name, name)
+
+
+def order(tabs):
+    """숫자 작은 순(main=0이 맨 앞, 11은 7 뒤), 숫자가 아닌 이름은 그 뒤에 이름순."""
+    def key(t):
+        lab = label(t[0])
+        return (0, int(lab), "") if lab.isdigit() else (1, 0, lab)
+    return sorted(tabs, key=key)
+
+
+def parse(names_arg):
+    tabs = []
+    for tok in names_arg.split():
+        name, _, mark = tok.partition("+")
+        tabs.append((name, mark))
+    return order(tabs)
+
+
+TAB_W = 4  # 넘칠 때 탭 고정폭: 두 자리 번호 + 양옆 한 칸. 이보다 긴 이름만 자기 길이+2
+
+
+def minw(name):
+    return max(TAB_W, len(label(name)) + 2)
+
+
+def spread(widths, extra):
+    """남는 칸을 앞에서부터 한 칸씩 나눠 준다."""
+    i = 0
+    while extra > 0 and widths:
+        widths[i % len(widths)] += 1
+        extra -= 1
+        i += 1
+    return widths
+
+
+def fit_all(tabs, width):
+    """다 들어가면 폭을 나눈 탭 폭 목록, 안 들어가면 None."""
+    n = len(tabs)
+    mins = [minw(t[0]) for t in tabs]
+    if sum(mins) + GAP * (n - 1) > width:
+        return None
+    # 똑같이 나누되, 이름이 길어 나눈 폭보다 큰 탭은 자기 최소폭을 쓰고 나머지끼리 다시 나눈다.
+    fixed = {}
+    while True:
+        free = [i for i in range(n) if i not in fixed]
+        avail = width - GAP * (n - 1) - sum(fixed.values())
+        share = avail // len(free)
+        big = [i for i in free if mins[i] > share]
+        if not big:
+            break
+        for i in big:
+            fixed[i] = mins[i]
+    widths = [fixed.get(i, share) for i in range(n)]
+    return widths  # 나눈 나머지 칸은 오른쪽 끝 빈칸(탭 폭을 1칸씩 다르게 하지 않는다)
+
+
+def visible_from(tabs, ofs, area):
+    """ofs부터 area 안에 통째로 들어가는 탭 개수."""
+    used, cnt = 0, 0
+    for name, _ in tabs[ofs:]:
+        need = minw(name) + (GAP if cnt else 0)
+        if used + need > area:
+            break
+        used += need
+        cnt += 1
+    return max(cnt, 1)
+
+
+def max_ofs(tabs, area):
+    for ofs in range(len(tabs)):
+        if ofs + visible_from(tabs, ofs, area) >= len(tabs):
+            return ofs
+    return 0
+
+
+PAD_LINE = False
+LABEL_DIR = os.path.expanduser("~/.cache/cchat-tablabel")
+
+
+def cells(ch):
+    return 2 if unicodedata.east_asian_width(ch) in "WF" else 1
+
+
+def width_of(text):
+    return sum(cells(c) for c in text)
+
+
+_titles = None
+HOST = os.uname().nodename.split(".")[0]
+
+
+def pane_title(name):
+    """claude가 붙인 대화 제목(터미널 제목). 앞의 상태 기호(✳, 스피너)는 떼고, 기본값 'Claude Code'는 없는 셈."""
+    global _titles
+    if _titles is None:
+        _titles = {}
+        for line in tmux("list-panes", "-a", "-F", "#{session_name}\t#{pane_title}").splitlines():
+            sess, _, title = line.partition("\t")
+            title = title.strip()
+            if title and not title[0].isalnum():
+                title = title[1:].strip()
+            if title and title != "Claude Code" and title.split(".")[0] != HOST:  # tmux 기본 제목은 컴퓨터 이름
+                _titles.setdefault(sess, title)
+    return _titles.get(name, "")
+
+
+def tab_label(name):
+    """이름표(claude 상태줄의 [번호] 옆 이름). 없으면 claude가 붙인 대화 제목."""
+    try:
+        with open(os.path.join(LABEL_DIR, name), encoding="utf-8") as f:
+            lab = " ".join(f.read().split())
+    except (OSError, ValueError):
+        lab = ""
+    return lab or pane_title(name)
+
+
+def clip(text, room):
+    """room 칸에 맞춘다. 넘치면 앞에서부터 room-1칸까지 넣고 마지막 칸은 …"""
+    if width_of(text) <= room:
+        return text
+    out, used = "", 0
+    for c in text:
+        if used + cells(c) > room - 1:
+            break
+        out += c
+        used += cells(c)
+    return out + " " * (room - 1 - used) + "…"
+
+
+def box(style, text, w, rng=None, busy=False):
+    if PAD_LINE:
+        text = clip(tab_label(rng), w - 1) if rng and not rng.startswith("_") else ""
+    pad = max(0, w - width_of(text))
+    left = pad // 2 if not rng or rng.startswith("_") else min(1, pad)  # 탭 이름은 왼쪽 정렬(한 칸 띄움), 화살표는 가운데
+    sp = (lambda n: f"#[fg=colour{BUSY_MARK}]{' ' * n}{style}") if busy else (lambda n: " " * n)
+    body = f"{style}{sp(left)}{text}{sp(pad - left)}"
+    if rng:
+        return f"#[range=user|{rng}]{body}#[norange]{PLAIN}"
+    return body + PLAIN
+
+
+def is_busy(name, mark, cur):
+    return mark == "busy" and name != cur
+
+
+def style_of(name, unread, cur):
+    if name == cur:
+        return CUR
+    if not unread or unread == "busy":
+        return OTHER
+    return ASK if unread == "ask" else DONE
+
+
+def render(client, width, cur, tabs):
+    if not tabs:
+        return ""
+    widths = fit_all(tabs, width)
+    if widths is not None:
+        parts = [box(style_of(n, u, cur), label(n), w, n, is_busy(n, u, cur)) for (n, u), w in zip(tabs, widths)]
+        return (" " * GAP).join(parts) + PLAIN
+
+    area = width - 2 * (ARROW_W + GAP)
+    top = max_ofs(tabs, area)
+    ofs = read_ofs(client)
+    if ofs is None:  # 처음 그릴 때는 지금 대화가 보이게
+        names = [t[0] for t in tabs]
+        ofs = 0
+        if cur in names:
+            ci = names.index(cur)
+            while ofs < top and not (ofs <= ci < ofs + visible_from(tabs, ofs, area)):
+                ofs += 1
+    ofs = min(max(ofs, 0), top)
+    cnt = visible_from(tabs, ofs, area)
+    shown = tabs[ofs:ofs + cnt]
+    ws = [minw(n) for n, _ in shown]  # 고정폭 그대로(남는 칸은 ▶ 앞 빈칸)
+    rest = max(0, area - sum(ws) - GAP * (len(ws) - 1))
+    left = box(ARROW_ON if ofs > 0 else ARROW_OFF, "◀", ARROW_W, "_prev")
+    right = box(ARROW_ON if ofs + cnt < len(tabs) else ARROW_OFF, "▶", ARROW_W, "_next")
+    mid = (" " * GAP).join(box(style_of(n, u, cur), label(n), w, n, is_busy(n, u, cur)) for (n, u), w in zip(shown, ws))
+    return f"{left}{' ' * GAP}{mid}{' ' * (GAP + rest)}{right}"
+
+
+def tmux(*args):
+    return subprocess.run(TMUX + list(args), capture_output=True, text=True).stdout.strip()
+
+
+def click(client, which):
+    width = int(tmux("display", "-p", "-c", client, "#{client_width}") or 80)
+    cur = tmux("display", "-p", "-c", client, "#{client_session}")
+    tabs = parse(tmux("list-sessions", "-F", "#{session_name}"))
+    if fit_all(tabs, width) is not None:
+        return
+    area = width - 2 * (ARROW_W + GAP)
+    top = max_ofs(tabs, area)
+    ofs = read_ofs(client)
+    if ofs is None:
+        ofs = 0
+        names = [t[0] for t in tabs]
+        if cur in names:
+            ci = names.index(cur)
+            while ofs < top and not (ofs <= ci < ofs + visible_from(tabs, ofs, area)):
+                ofs += 1
+    ofs = min(max(ofs + (1 if which == "_next" else -1), 0), top)
+    write_ofs(client, ofs)
+    gen = tmux("show", "-gv", "@cchat_tabgen") or "0"
+    tmux("set", "-g", "@cchat_tabgen", str(int(gen) + 1 if gen.isdigit() else 1))
+    tmux("refresh-client", "-t", client, "-S")
+
+
+def go(client, which):
+    cur = tmux("display", "-p", "-c", client, "#{client_session}")
+    names = [n for n, _ in parse(tmux("list-sessions", "-F", "#{session_name}"))]
+    if not names:
+        return
+    if which in ("prev", "next"):
+        i = names.index(cur) if cur in names else 0
+        target = names[(i + (1 if which == "next" else -1)) % len(names)]
+    else:
+        target = next((n for n in names if label(n) == which), None)
+        if target is None:
+            return
+    if target == cur:
+        return
+    try:  # 탭이 넘칠 때 새 대화가 보이게 범위를 다시 잡는다
+        os.remove(state_path(client))
+    except OSError:
+        pass
+    tmux("switch-client", "-c", client, "-t", f"={target}:")
+
+
+def main(argv):
+    global PAD_LINE
+    if len(argv) >= 5 and argv[0] == "render":
+        PAD_LINE = len(argv) >= 7 and argv[6] == "pad"
+        client, width, cur, names = argv[1], int(argv[2] or 80), argv[3], argv[4]
+        print(render(client, width, cur, parse(names)))
+    elif len(argv) == 3 and argv[0] == "go":
+        go(argv[1], argv[2])
+    elif len(argv) == 3 and argv[0] == "click":
+        click(argv[1], argv[2])
+    else:
+        print(__doc__, file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

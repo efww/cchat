@@ -1,0 +1,21 @@
+#!/bin/zsh
+# cchat 세션 이름표: status line에 "[세션] 이름표"로 보인다.
+#   cchat-label                 모든 세션의 이름표 보기
+#   cchat-label <이름표>        지금 세션(cchat tmux 안)에 이름표 달기
+#   cchat-label <세션> <이름표> 다른 세션에 이름표 달기 (예: cchat-label 2 arowser)
+#   cchat-label <세션> -        이름표 지우기
+dir=~/.config/cchat/labels
+mkdir -p $dir
+if (( $# == 0 )); then
+  for f in $dir/*(N); do print "${f:t}: $(<$f)"; done
+  exit 0
+fi
+if (( $# == 1 )); then
+  [[ "$TMUX" == */cchat,* ]] || { print "cchat 세션 안이 아닙니다. cchat-label <세션> <이름표> 로 지정하세요."; exit 1; }
+  sess=$(@@BREW@@/tmux -L cchat display -p -t "$TMUX_PANE" '#S'); label=$1
+else
+  sess=$1; label=$2
+fi
+[[ "$sess" =~ '^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$' ]] || { print "잘못된 세션 이름: $sess"; exit 1; }
+if [[ "$label" == - ]]; then rm -f $dir/$sess; print "$sess: 이름표 지움"
+else print -r -- "$label" > $dir/$sess; print "$sess: $label"; fi

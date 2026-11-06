@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>LANG</key>
+		<string>en_US.UTF-8</string>
+		<key>PATH</key>
+		<string>@@HOME@@/.local/bin:@@BREW@@:/usr/bin:/bin:/usr/sbin:/sbin</string>
+	</dict>
+	<key>KeepAlive</key>
+	<true/>
+	<key>Label</key>
+	<string>@@LAUNCHD_PREFIX@@.ttyd</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>@@BREW@@/ttyd</string>
+		<string>-i</string>
+		<string>lo0</string>
+		<string>-p</string>
+		<string>@@PORT@@</string>
+		<string>-b</string>
+		<string>/cchat</string>
+		<string>-W</string>
+		<string>-a</string>
+		<string>-t</string>
+		<string>titleFixed=cchat</string>
+		<string>-t</string>
+		<string>fontSize=@@FONT_SIZE@@</string>
+		<string>-t</string>
+		<string>disableLeaveAlert=true</string>
+		<string>-I</string>
+		<string>@@HOME@@/.config/cchat/index.html</string>
+		<string>@@HOME@@/.local/bin/cchat-session</string>
+		<string>attach</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StandardErrorPath</key>
+	<string>@@HOME@@/Library/Logs/cchat-ttyd.log</string>
+	<key>StandardOutPath</key>
+	<string>@@HOME@@/Library/Logs/cchat-ttyd.log</string>
+	<key>ThrottleInterval</key>
+	<integer>5</integer>
+</dict>
+</plist>

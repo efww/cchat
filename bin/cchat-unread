@@ -1,0 +1,49 @@
+#!/bin/zsh
+# claude 훅(config/claude-settings.json): cchat 대화에서 답이 끝났거나(done, Stop 훅) 허락이나 답을 기다리는데(ask: PermissionRequest 훅, AskUserQuestion·ExitPlanMode 직전 PreToolUse 훅)
+# 사용자가 지금 그 대화를 보고 있지 않으면 tmux 세션 옵션 @unread=done|ask → 상태줄 탭이 녹색|주황.
+# 아무것도 출력하지 않으므로 허락 창은 평소처럼 뜬다.
+# busy(UserPromptSubmit 훅) = 작업 중 → @busy=1(탭이 2초마다 은은하게 깜빡임, 브라우저가 그림).
+# idle(Notification idle_prompt 훅, 입력 대기 1분쯤) = 작업 중 표시만 끈다(Esc로 중단하면 Stop이 안 와서 남는 것 정리).
+# done/ask는 작업 중 표시를 끄고 위 규칙대로 색을 켠다.
+# "보고 있음" = 그 대화를 띄운 화면 중 하나가 포커스를 가졌거나(client_flags의 focused) 2분 안에 입력(키·탭·스크롤)이 있었음.
+#   예전엔 "가장 최근에 입력한 화면의 대화"만 봤더니, 브라우저를 뒤로 보내 두고 자리를 비운 사이 그 대화가 끝나면 표시가 안 됐다.
+cat >/dev/null
+kind=${1:-done}
+[[ "$TMUX" == */cchat,* && -n "$TMUX_PANE" ]] || exit 0
+T=(@@BREW@@/tmux -L cchat)
+s=$($T display -p -t "$TMUX_PANE" '#{session_name}') || exit 0
+refresh() { $T list-clients -F '#{client_name}' | while read -r c; do $T refresh-client -t "$c" -S; done; }
+case "$kind" in
+  busy)
+    $T set -t "=$s:" @busy 1; refresh
+    # Esc로 중단하면 Stop 훅이 안 와서 작업 중 표시가 남는다(idle_prompt 알림도 안 옴, 2026-11-06 확인).
+    # 그래서 작업 중인 동안 15초마다 화면을 보고, claude의 진행 표시줄("… (12s ·" 같은 것)이 두 번 연속 없으면 끈다.
+    pidf=~/.cache/cchat-busy/$s.pid; mkdir -p ${pidf:h}
+    if ! { [[ -f $pidf ]] && kill -0 "$(<$pidf)" 2>/dev/null; }; then
+      (
+        miss=0
+        while sleep 15; do
+          [[ -n "$($T show -t "=$s:" -qv @busy 2>/dev/null)" ]] || break
+          if $T capture-pane -p -t "$TMUX_PANE" 2>/dev/null | grep -qE '… \(([0-9]+h )?([0-9]+m )?[0-9]+s'; then miss=0
+          else (( ++miss >= 2 )) && { $T set -u -t "=$s:" @busy; refresh; break; }; fi
+        done
+        rm -f $pidf
+      ) </dev/null >/dev/null 2>&1 &!
+      print $! > $pidf
+    fi
+    exit 0 ;;
+  idle) [[ -n "$($T show -t "=$s:" -qv @busy)" ]] && { $T set -u -t "=$s:" @busy; refresh; }; exit 0 ;;
+esac
+$T set -u -t "=$s:" @busy
+now=$(date +%s)
+viewing=""
+while read -r sess act flags; do
+  [[ "$sess" == "$s" ]] || continue
+  if [[ ",$flags," == *,focused,* ]] || (( now - act < 120 )); then viewing=yes; break; fi
+done < <($T list-clients -F '#{client_session} #{client_activity} #{client_flags}')
+LOG=~/Library/Logs/cchat-unread.log
+print -r -- "$(date '+%m-%d %T') $kind s=$s viewing=${viewing:-no}" >>$LOG
+[[ -n "$viewing" ]] && { refresh; exit 0; }
+$T set -t "=$s:" @unread "$kind"
+refresh
+exit 0
