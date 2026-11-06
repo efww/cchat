@@ -1,55 +1,57 @@
 # cchat
 
-Claude Code를 브라우저(PC·폰)에서 쓰는 웹 터미널. 맥 한 대에서 [ttyd](https://github.com/tsl0922/ttyd) + tmux로 claude 대화 여러 개를 띄워 두고, 아래 탭으로 오간다.
+**English** | [한국어](README.ko.md)
 
-*Browser front-end for Claude Code on a Mac: ttyd + tmux, several claude sessions as tabs, with done / needs-approval / working indicators.*
+A browser front-end (desktop and phone) for [Claude Code](https://docs.anthropic.com/claude-code) running on a Mac. It uses [ttyd](https://github.com/tsl0922/ttyd) + tmux to keep several claude sessions alive and lets you switch between them with tabs at the bottom of the screen.
 
-## 무엇이 되나
+## Features
 
-- **대화 탭**: 맨 아래 두 줄이 대화 탭. 위 줄은 번호, 아래 줄은 대화 이름표(길면 `…`로 줄임).
-  - 검정 = 지금 보는 대화
-  - 녹색 = 답이 끝났는데 아직 안 본 대화
-  - 주황 = 허락·질문을 기다리는 대화
-  - 회색 깜빡임(2초) = 작업 중(여러 탭이 같은 박자로)
-- **PC 단축키**: Alt(Option)+숫자 = 그 번호 대화, Alt+←/→ = 이전/다음. Ctrl+V는 PC 클립보드를 붙인다.
-- **폰**: 손가락 드래그 스크롤, 키 바(Esc·Tab·화살표 등), 다크 테마.
-- 대화는 tmux 안에 있어 브라우저를 닫아도 계속 돈다. URL `?arg=이름`으로 그 이름의 대화에 붙는다(없으면 만든다).
+- **Session tabs**: the bottom two rows are session tabs. The top row shows the number; the bottom row shows the session label (cut off with `…` when too long).
+  - Black = the session you are viewing
+  - Green = finished replying, not seen yet
+  - Orange = waiting for your permission or answer
+  - Blinking gray (2 s) = working (all working tabs blink in sync)
+- **Desktop shortcuts**: Alt(Option)+number = go to that session, Alt+←/→ = previous/next. Ctrl+V pastes your local (browser) clipboard.
+- **Phone**: finger-drag scrolling, a key bar (Esc, Tab, arrows, …), dark theme.
+- Sessions live inside tmux, so they keep running after you close the browser. Open the URL with `?arg=name` to attach to that session (created if missing).
 
-## 필요한 것
+## Requirements
 
-macOS, Homebrew `ttyd` `tmux`, python3, [Claude Code](https://docs.anthropic.com/claude-code) CLI(`~/.local/bin/claude`).
+macOS, Homebrew `ttyd` and `tmux`, python3, and the Claude Code CLI (`~/.local/bin/claude`).
 
-## 설치
+## Install
 
 ```sh
-cp cchat.conf.example my.conf     # 값 고치기 (작업 폴더, 포트, 권한 모드 등)
+cp cchat.conf.example my.conf     # edit values (work folder, port, permission mode, …)
 ./install.sh -c my.conf
 open http://127.0.0.1:7681/cchat/
 ```
 
-`install.sh`는 `bin/ config/ launchd/`의 `@@이름@@` 자리에 설정 값을 넣어 `~/.local/bin`, `~/.config/cchat`, `~/Library/LaunchAgents`에 깔고 launchd 서비스를 (다시) 올린다.
-설치 없이 결과만 보려면 `./install.sh -c my.conf --render-only /tmp/out`.
+`install.sh` fills the `@@NAME@@` placeholders in `bin/ config/ launchd/` with your config values, installs them into `~/.local/bin`, `~/.config/cchat` and `~/Library/LaunchAgents`, and (re)starts the launchd services.
+To render without installing: `./install.sh -c my.conf --render-only /tmp/out`.
 
-## 밖에서 접속할 때 (주의)
+## Remote access (read this)
 
-ttyd는 127.0.0.1에만 열리고 **자체 인증이 없다**. 밖에서 쓰려면 `TUNNEL_HOST`(SSH 역방향 통로)로 서버에 열고, 그 앞에 반드시 인증(Cloudflare Access, OAuth 프록시 등)을 둔다.
-`PERMISSION_MODE=bypassPermissions`는 claude가 확인 없이 명령을 실행하므로, 접속 인증이 확실할 때만 쓴다.
+ttyd listens on 127.0.0.1 only and has **no authentication of its own**. To use it from outside, expose it through `TUNNEL_HOST` (a reverse SSH tunnel to your server) and always put authentication in front of it (Cloudflare Access, an OAuth proxy, etc.).
+`PERMISSION_MODE=bypassPermissions` lets claude run commands without asking — use it only when access is properly authenticated.
 
-## 구성
+## Layout
 
-| 파일 | 역할 |
+| File | Role |
 |---|---|
-| `bin/cchat-session` | ttyd가 접속마다 실행. tmux 대화에 붙고, 안에서 claude를 반복 실행 |
-| `bin/cchat-tabs` | 상태줄 대화 탭 그리기, 클릭·단축키 전환 |
-| `bin/cchat-unread` | claude 훅(완료·허락·작업 시작)에서 탭 색 표시 |
-| `bin/cchat-build-index` | ttyd 기본 화면에 cchat 부분(테마, 폰 키 바·스크롤, 단축키, 깜빡임)을 넣어 `index.html` 생성 |
-| `bin/cchat-label` | 대화 이름표 직접 달기 |
-| `bin/cchat-tunnel` | (선택) SSH 역방향 통로 |
-| `bin/cchat-update` | (선택) 매일 claude CLI 업데이트 |
-| `config/` | tmux 설정, claude 설정(테마·훅) |
-| `launchd/` | 서비스 정의 |
+| `bin/cchat-session` | Run by ttyd for each connection. Attaches to a tmux session and runs claude in a loop inside it |
+| `bin/cchat-tabs` | Draws the session tabs in the status line; handles clicks and shortcuts |
+| `bin/cchat-unread` | Called by claude hooks (done, permission, started work) to color the tabs |
+| `bin/cchat-build-index` | Builds `index.html` from ttyd's default page plus the cchat parts (themes, phone key bar and scrolling, shortcuts, blinking) |
+| `bin/cchat-label` | Set a session label by hand |
+| `bin/cchat-tunnel` | (optional) reverse SSH tunnel |
+| `bin/cchat-update` | (optional) daily claude CLI update |
+| `config/` | tmux config, claude settings (theme, hooks) |
+| `launchd/` | Service definitions |
 
-탭 이름표는 `~/.cache/cchat-tablabel/<대화>` 파일이 있으면 그것(상태줄 스크립트 등에서 써 넣을 수 있음), 없으면 claude가 붙인 대화 제목을 쓴다.
+Tab labels come from `~/.cache/cchat-tablabel/<session>` if that file exists (e.g. written by your status line script); otherwise the title claude gave the conversation is used.
+
+Code comments are in Korean.
 
 ## License
 
