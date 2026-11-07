@@ -50,7 +50,7 @@ Update: `git pull && ./install.sh -c my.conf`. Uninstall and details: [INSTALL.m
   - Black = the session you are viewing
   - Green = finished replying, not seen yet
   - Orange = waiting for your permission or answer
-  - Blinking gray (2 s) = working (all working tabs blink in sync)
+  - Blinking gray (1.5 s) = working (all working tabs blink in sync)
 - **Desktop shortcuts**: Alt(Option)+number = go to that session, Alt+←/→ = previous/next. Ctrl+V pastes your local (browser) clipboard.
 - **Phone**: finger-drag scrolling, a key bar (Esc, Tab, arrows, …), dark theme.
 - Sessions live inside tmux, so they keep running after you close the browser. Open the URL with `?arg=name` to attach to that session (created if missing).

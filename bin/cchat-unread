@@ -2,7 +2,7 @@
 # claude 훅(config/claude-settings.json): cchat 대화에서 답이 끝났거나(done, Stop 훅) 허락이나 답을 기다리는데(ask: PermissionRequest 훅, AskUserQuestion·ExitPlanMode 직전 PreToolUse 훅)
 # 사용자가 지금 그 대화를 보고 있지 않으면 tmux 세션 옵션 @unread=done|ask → 상태줄 탭이 녹색|주황.
 # 아무것도 출력하지 않으므로 허락 창은 평소처럼 뜬다.
-# busy(UserPromptSubmit 훅) = 작업 중 → @busy=1(탭이 2초마다 은은하게 깜빡임, 브라우저가 그림).
+# busy(UserPromptSubmit 훅) = 작업 중 → @busy=1(탭이 1.5초마다 은은하게 깜빡임, 브라우저가 그림).
 # idle(Notification idle_prompt 훅, 입력 대기 1분쯤) = 작업 중 표시만 끈다(Esc로 중단하면 Stop이 안 와서 남는 것 정리).
 # done/ask는 작업 중 표시를 끄고 위 규칙대로 색을 켠다.
 # "보고 있음" = 그 대화를 띄운 화면 중 하나가 포커스를 가졌거나(client_flags의 focused) 2분 안에 입력(키·탭·스크롤)이 있었음.
