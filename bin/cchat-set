@@ -1,0 +1,73 @@
+#!/bin/zsh
+# cchat 설정 보기·바꾸기. 값은 ~/.config/cchat/settings(key=value)에 두고, 바꾸면 필요한 곳에 바로 적용한다.
+# cchat 안의 claude에게 "폰 알림만 켜 줘"처럼 말하면 claude가 이 명령을 쓴다(cchat-session이 시스템 프롬프트로 알려 줌).
+#   cchat-set                          지금 설정 보기
+#   cchat-set notify on|off            알림 전체
+#   cchat-set notify pc|phone on|off   기기별(브라우저에서 '알림 켜기'로 등록한 기기)
+#   cchat-set notify done|ask on|off   종류별: done=답 끝남, ask=확인 기다림
+#   cchat-set notify test              지금 설정대로 테스트 알림 보내기
+#   cchat-set quiet 01-08|off          방해 금지 시간(시 단위, 이 시간엔 알림 안 보냄)
+#   cchat-set blink <초>               작업 중 탭 깜빡임 박자(0.5~5, 기본 1.5) — 브라우저 새로고침 필요
+#   cchat-set font pc|phone <px>|off   글자 크기(8~32, off=기본 @@FONT_SIZE@@) — 브라우저 새로고침 필요
+# 내부용: cchat-set --devices-for <done|ask|test>  지금 알림을 보낼 기기 목록(없으면 빈 줄)
+F=@@HOME@@/.config/cchat/settings
+N=@@HOME@@/.config/cchat/notify
+typeset -A D=(notify on notify.pc on notify.phone on notify.done on notify.ask on quiet off blink 1.5 font.pc off font.phone off)
+ORDER=(notify notify.pc notify.phone notify.done notify.ask quiet blink font.pc font.phone)
+
+get() { local v; v=$(grep -m1 "^$1=" $F 2>/dev/null | cut -d= -f2-); print -r -- "${v:-${D[$1]}}"; }
+put() {
+  mkdir -p ${F:h}; touch $F
+  grep -v "^$1=" $F > $F.tmp; print -r -- "$1=$2" >> $F.tmp; mv $F.tmp $F
+  print "$1 = $2"
+}
+onoff() { [[ "$1" == (on|off) ]] || { print -u2 "on 또는 off"; exit 2; }; }
+rebuild() {
+  @@HOME@@/.local/bin/cchat-build-index >/dev/null && print "페이지를 다시 만들었습니다. 열려 있는 브라우저는 새로고침하세요."
+}
+quiet_now() {  # 방해 금지 시간이면 0
+  local q=$(get quiet) h=$(( 10#$(date +%H) )) a b
+  [[ "$q" =~ '^([0-9]{1,2})-([0-9]{1,2})$' ]] || return 1
+  a=$(( 10#$match[1] )) b=$(( 10#$match[2] ))
+  if (( a <= b )); then (( h >= a && h < b )); else (( h >= a || h < b )); fi
+}
+devices_for() {  # <done|ask|test>
+  [[ $(get notify) == on ]] || return 0
+  [[ $1 == test ]] || { [[ $(get notify.$1) == on ]] && ! quiet_now; } || return 0
+  local out=()
+  for d in pc phone; do [[ $(get notify.$d) == on ]] && out+=$d; done
+  print -r -- "$out"
+}
+
+case "${1:-}" in
+  "")
+    for k in $ORDER; do printf '%-13s %s\n' $k "$(get $k)"; done
+    [[ -x $N ]] || print "(알림 훅 $N 이 없어 알림은 보내지 않습니다)"
+    ;;
+  --devices-for) devices_for "$2" ;;
+  notify)
+    case "${2:-}" in
+      on|off) put notify $2 ;;
+      pc|phone|done|ask) onoff "$3"; put notify.$2 $3 ;;
+      test)
+        [[ -x $N ]] || { print -u2 "알림 훅이 없습니다: $N"; exit 1; }
+        devs=$(devices_for test)
+        [[ -n "$devs" ]] || { print "꺼져 있어 보내지 않았습니다(cchat-set 으로 확인)"; exit 0; }
+        CCHAT_NOTIFY_DEVICES="$devs" $N test test
+        tail -1 @@HOME@@/Library/Logs/cchat-unread.log ;;
+      *) print -u2 "cchat-set notify on|off | pc|phone|done|ask on|off | test"; exit 2 ;;
+    esac ;;
+  quiet)
+    if [[ "${2:-}" == off ]]; then put quiet off
+    elif [[ "${2:-}" =~ '^([0-9]{1,2})-([0-9]{1,2})$' ]] && (( 10#$match[1] < 24 && 10#$match[2] < 24 )); then put quiet $2
+    else print -u2 "예: cchat-set quiet 01-08 (01시~08시) / cchat-set quiet off"; exit 2; fi ;;
+  blink)
+    [[ "${2:-}" =~ '^[0-9]+(\.[0-9]+)?$' ]] && (( $2 >= 0.5 && $2 <= 5 )) || { print -u2 "0.5~5 사이 초"; exit 2; }
+    put blink $2; rebuild ;;
+  font)
+    [[ "${2:-}" == (pc|phone) ]] || { print -u2 "cchat-set font pc|phone <px>|off"; exit 2; }
+    if [[ "${3:-}" == off ]] || { [[ "${3:-}" =~ '^[0-9]+$' ]] && (( $3 >= 8 && $3 <= 32 )); }; then put font.$2 $3; rebuild
+    else print -u2 "8~32 또는 off"; exit 2; fi ;;
+  -h|--help|help) sed -n '2,13p' $0 | sed 's/^# \{0,1\}//' ;;
+  *) print -u2 "모르는 설정: $1 (cchat-set help)"; exit 2 ;;
+esac

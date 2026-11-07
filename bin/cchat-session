@@ -16,10 +16,13 @@ case "$1" in
   --loop)
     cd "$WORKDIR" || exit 1
     # --loop <claude 세션 id>: 처음 한 번은 그 대화를 이어서 연다(설정을 다시 읽히려고 대화를 다시 띄울 때).
+    # cchat 설정을 말로 바꿀 수 있게 claude에게 cchat-set을 알려 준다.
+    CCHAT_HINT='This session runs inside cchat (a browser terminal with session tabs). When the user asks to change cchat settings (notifications on/off per device pc/phone or per kind done/ask, quiet hours, tab blink speed, font size), use the `cchat-set` command (`cchat-set help` lists options; `cchat-set` shows current values). Tab names: `cchat-label`.'
     resume=()
     [[ "$2" == [0-9a-f]##-[0-9a-f-]## ]] && resume=(--resume "$2")
     while true; do
-      claude --permission-mode "$PERMISSION_MODE" --settings @@HOME@@/.config/cchat/claude-settings.json "${resume[@]}"
+      claude --permission-mode "$PERMISSION_MODE" --settings @@HOME@@/.config/cchat/claude-settings.json \
+        --append-system-prompt "$CCHAT_HINT" "${resume[@]}"
       resume=()
       # /exit 처럼 정상 종료(0)면 바로 이 대화를 닫는다. 비정상 종료일 때만 아래에서 물어본다.
       (( $? == 0 )) && exit 0

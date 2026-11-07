@@ -65,6 +65,19 @@ open "http://127.0.0.1:7681/cchat/?arg=1"
 
 폰에서는 탭을 눌러 옮기고, 손가락으로 끌어 스크롤하고, 키 바로 Esc·Tab·화살표를 쓴다.
 
+## 설정: 말로 시키면 됨
+
+cchat 탭 아무 데서나 claude에게 "깜빡임 좀 빠르게", "폰 글자 크게"라고 하면 됩니다. claude가 `cchat-set`을 씁니다(직접 쳐도 됨):
+
+| 명령 | 하는 일 |
+|---|---|
+| `cchat-set` | 지금 설정 보기 |
+| `cchat-set blink 1.5` | 작업 중 탭 깜빡임 박자(초) |
+| `cchat-set font phone 16` / `font pc off` | 기기별 글자 크기(`off` = `FONT_SIZE`) |
+| `cchat-set notify on\|off`, `notify pc\|phone\|done\|ask on\|off`, `quiet 01-08` | 알림(알림 훅 필요, 아래) |
+
+깜빡임·글자 크기는 브라우저 새로고침 뒤 적용됩니다. 알림: `~/.config/cchat/notify`가 실행 파일로 있으면, 보고 있지 않은 탭이 녹색·주황이 될 때 `notify <세션> <done|ask|test>`로 부릅니다(`CCHAT_NOTIFY_DEVICES` 함께). 푸시 서버는 들어 있지 않고, 훅에서 웹 푸시·ntfy·텔레그램 등 원하는 곳으로 보내면 됩니다.
+
 ## 밖에서 접속할 때 (주의)
 
 ttyd는 127.0.0.1에만 열리고 **자체 인증이 없다**. 밖에서 쓰려면 `TUNNEL_HOST`(SSH 역방향 통로)로 서버에 열고, 그 앞에 반드시 인증(Cloudflare Access, OAuth 프록시 등)을 둔다.
@@ -78,6 +91,7 @@ ttyd는 127.0.0.1에만 열리고 **자체 인증이 없다**. 밖에서 쓰려�
 | `bin/cchat-tabs` | 상태줄 대화 탭 그리기, 클릭·단축키 전환 |
 | `bin/cchat-unread` | claude 훅(완료·허락·작업 시작)에서 탭 색 표시 |
 | `bin/cchat-build-index` | ttyd 기본 화면에 cchat 부분(테마, 폰 키 바·스크롤, 단축키, 깜빡임)을 넣어 `index.html` 생성 |
+| `bin/cchat-set` | 설정 보기·바꾸기(`~/.config/cchat/settings`) |
 | `bin/cchat-label` | 대화 이름표 직접 달기 |
 | `bin/cchat-tunnel` | (선택) SSH 역방향 통로 |
 | `bin/cchat-update` | (선택) 매일 claude CLI 업데이트 |

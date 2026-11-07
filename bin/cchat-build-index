@@ -20,6 +20,23 @@ from pathlib import Path
 TTYD = "@@BREW@@/ttyd"
 TEMP_PORT = 7699
 OUT = Path("@@HOME@@/.config/cchat/index.html")
+SETTINGS = Path("@@HOME@@/.config/cchat/settings")  # cchat-set이 쓰는 key=value
+
+
+def setting(key: str, default: str) -> str:
+    try:
+        for line in SETTINGS.read_text(encoding="utf-8").splitlines():
+            k, _, v = line.partition("=")
+            if k.strip() == key and v.strip():
+                return v.strip()
+    except OSError:
+        pass
+    return default
+
+
+def font_px(key: str) -> int:
+    v = setting(key, "off")
+    return int(v) if v.isdigit() and 8 <= int(v) <= 32 else 0
 
 LIGHT = {
     "background": "#fbfbfd", "foreground": "#1f2328", "cursor": "#1f2328", "cursorAccent": "#fbfbfd",
@@ -85,7 +102,7 @@ html[data-cchat-device=mobile] #cchat-keys{display:flex;position:fixed;left:0;ri
 
 SCRIPT = """<script id="cchat-script">
 (() => {
-  const LIGHT = __LIGHT__, DARK = __DARK__, KEYS = __KEYS__, BUILD = '__BUILD__';
+  const LIGHT = __LIGHT__, DARK = __DARK__, KEYS = __KEYS__, BUILD = '__BUILD__', SET = __SET__;
   const mq = (q) => { try { return matchMedia(q).matches; } catch (_) { return false; } };
   const coarse = mq('(pointer: coarse)');
   const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '') || coarse
@@ -458,9 +475,9 @@ SCRIPT = """<script id="cchat-script">
   }
 
   // 작업 중 탭 깜빡임: cchat-tabs가 작업 중 탭의 빈칸 글자색을 BUSY_MARK(256색 123번)로 칠해 둔다(빈칸이라 안 보임).
-  // 1초마다 맨 아래 2줄(상태줄)만 읽어 그 탭의 칸 범위를 찾고, 그 위에 반투명 판을 얹어 1.5초마다 판을 담은 층 전체의 진하기를 딱 바꾼다(모든 탭 같은 박자).
+  // 1초마다 맨 아래 2줄(상태줄)만 읽어 그 탭의 칸 범위를 찾고, 그 위에 반투명 판을 얹어 cchat-set blink 박자(기본 1.5초)마다 판을 담은 층 전체의 진하기를 딱 바꾼다(모든 탭 같은 박자).
   // 터미널 색·글자 그림은 건드리지 않고(다시 그리기 없음), 판은 입력을 통과시킨다(pointer-events:none).
-  const BUSY_MARK = 123, BUSY_CYCLE = 3000;
+  const BUSY_MARK = 123, BUSY_CYCLE = SET.blinkMs;
   let busyKey = '';
   const busyLayer = () => {
     let el = document.getElementById('cchat-busy');
@@ -515,7 +532,7 @@ SCRIPT = """<script id="cchat-script">
   };
   setInterval(scanBusy, 1000);
   // 깜빡임은 판 하나하나가 아니라 판을 담은 층 전체를 한 번에 켜고 끈다 → 여러 탭이 언제 시작했든 항상 같은 박자.
-  // 박자는 시계 기준(1.5초 평소, 1.5초 짙게)이라 판을 새로 그려도 어긋나지 않는다.
+  // 박자는 시계 기준(blink초 평소, blink초 짙게)이라 판을 새로 그려도 어긋나지 않는다.
   setInterval(() => {
     const el = document.getElementById('cchat-busy');
     if (el) el.style.opacity = Math.floor(Date.now() / (BUSY_CYCLE / 2)) % 2 ? '1' : '0';
@@ -568,6 +585,12 @@ SCRIPT = """<script id="cchat-script">
     installTitle(term);
     const cur = term.options.theme || {};
     if (cur.background !== theme.background || cur.black !== theme.black) term.options.theme = theme;
+    // cchat-set font pc|phone <px>: 기기별 글자 크기. 바꾼 뒤 ttyd의 term.fit()으로 칸 수를 다시 맞춘다(서버에도 크기가 전달됨).
+    const font = mobile ? SET.fontPhone : SET.fontPc;
+    if (font && term.options.fontSize !== font) {
+      term.options.fontSize = font;
+      setTimeout(() => { try { typeof term.fit === 'function' ? term.fit() : window.dispatchEvent(new Event('resize')); } catch (_) {} }, 50);
+    }
     if (mobile && document.body && !document.getElementById('cchat-keys')) buildKeys();
     if (mobile) installTouchScroll();
   };
@@ -596,6 +619,15 @@ def fetch_base_index() -> str:
         proc.wait(timeout=5)
 
 
+def settings() -> dict:
+    """cchat-set 값 중 페이지가 쓰는 것: 깜빡임 한 주기(ms, 평소+짙게), 기기별 글자 크기(0=ttyd 기본)."""
+    try:
+        blink = min(5.0, max(0.5, float(setting("blink", "1.5"))))
+    except ValueError:
+        blink = 1.5
+    return {"blinkMs": int(blink * 2000), "fontPc": font_px("font.pc"), "fontPhone": font_px("font.phone")}
+
+
 def main() -> None:
     html = fetch_base_index()
     charset = '<meta charset="UTF-8">'
@@ -604,7 +636,8 @@ def main() -> None:
     script = (SCRIPT.replace("__LIGHT__", json.dumps(LIGHT))
               .replace("__DARK__", json.dumps(DARK))
               .replace("__KEYS__", json.dumps(KEYS))
-              .replace("__BUILD__", time.strftime("%m%d%H%M")))
+              .replace("__BUILD__", time.strftime("%m%d%H%M"))
+              .replace("__SET__", json.dumps(settings())))
     html = html.replace(charset, f"{charset}\n<!-- cchat: built by ~/.local/bin/cchat-build-index -->\n{VIEWPORT}", 1)
     html = html.replace("</head>", f"{STYLE}\n{script}\n</head>", 1)
     OUT.write_text(html, encoding="utf-8")

@@ -65,6 +65,19 @@ Update: `git pull && ./install.sh -c my.conf`. Uninstall and details: [INSTALL.m
 
 On a phone, tap a tab to switch; drag with your finger to scroll, and use the key bar for Esc, Tab and arrows.
 
+## Settings: just ask
+
+Tell claude in any cchat tab, e.g. "make the blink faster" or "bigger font on my phone". It uses `cchat-set` (run it yourself if you prefer):
+
+| Command | Effect |
+|---|---|
+| `cchat-set` | Show current settings |
+| `cchat-set blink 1.5` | Blink period of working tabs, in seconds |
+| `cchat-set font phone 16` / `font pc off` | Font size per device (`off` = `FONT_SIZE`) |
+| `cchat-set notify on\|off`, `notify pc\|phone\|done\|ask on\|off`, `quiet 01-08` | Notifications (needs a notify hook, see below) |
+
+Blink and font apply after a browser reload. Notifications: if `~/.config/cchat/notify` exists and is executable, cchat runs it as `notify <session> <done|ask|test>` (with `CCHAT_NOTIFY_DEVICES`) whenever a tab you are not looking at turns green or orange. cchat does not ship a push server; the hook can send to anything (web push, ntfy, Telegram…).
+
 ## Remote access (read this)
 
 ttyd listens on 127.0.0.1 only and has **no authentication of its own**. To use it from outside, expose it through `TUNNEL_HOST` (a reverse SSH tunnel to your server) and always put authentication in front of it (Cloudflare Access, an OAuth proxy, etc.).
@@ -78,6 +91,7 @@ ttyd listens on 127.0.0.1 only and has **no authentication of its own**. To use 
 | `bin/cchat-tabs` | Draws the session tabs in the status line; handles clicks and shortcuts |
 | `bin/cchat-unread` | Called by claude hooks (done, permission, started work) to color the tabs |
 | `bin/cchat-build-index` | Builds `index.html` from ttyd's default page plus the cchat parts (themes, phone key bar and scrolling, shortcuts, blinking) |
+| `bin/cchat-set` | View and change settings (`~/.config/cchat/settings`) |
 | `bin/cchat-label` | Set a session label by hand |
 | `bin/cchat-tunnel` | (optional) reverse SSH tunnel |
 | `bin/cchat-update` | (optional) daily claude CLI update |
