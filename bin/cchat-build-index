@@ -521,6 +521,45 @@ SCRIPT = """<script id="cchat-script">
     if (el) el.style.opacity = Math.floor(Date.now() / (BUSY_CYCLE / 2)) % 2 ? '1' : '0';
   }, 100);
 
+  // 웹 푸시 알림(PC·안드로이드 Chrome): 원격 중계가 ./sw.js와 ./push/key를 내줄 때만 켜진다(이 맥 주소로 바로 열면 404라 아무것도 안 함).
+  // 허락 전이면 오른쪽 위에 '알림 켜기' 버튼을 띄우고(× 로 숨김), 허락돼 있으면 열 때마다 구독을 중계에 다시 알린다.
+  const pushSetup = async () => {
+    if (!window.isSecureContext || !('serviceWorker' in navigator) || !('PushManager' in window) || !window.Notification) return;
+    if (Notification.permission === 'denied') return;
+    let key;
+    try { const r = await fetch('./push/key', { cache: 'no-store' }); if (!r.ok) return; key = (await r.text()).trim(); } catch (_) { return; }
+    const b64 = (k) => { const s = atob((k + '='.repeat((4 - k.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(s, (c) => c.charCodeAt(0)); };
+    const subscribe = async () => {
+      const reg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
+      await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      const want = b64(key), have = sub && sub.options.applicationServerKey && new Uint8Array(sub.options.applicationServerKey);
+      if (sub && !(have && have.length === want.length && have.every((v, i) => v === want[i]))) {
+        await sub.unsubscribe(); sub = null;
+      }
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(key) });
+      await fetch('./push/subscribe', { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ subscription: sub.toJSON(), device: mobile ? 'phone' : 'pc' }) });
+    };
+    if (Notification.permission === 'granted') { subscribe().catch((e) => console.warn('cchat push', e)); return; }
+    try { if (localStorage.getItem('cchat-push-hide')) return; } catch (_) {}
+    const bar = document.createElement('div');
+    bar.id = 'cchat-push';
+    bar.style.cssText = 'position:fixed;top:8px;right:8px;z-index:20;display:flex;gap:2px;font:600 13px/1 system-ui,sans-serif;'
+      + 'border-radius:8px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.25)';
+    const btn = (t) => { const b = document.createElement('button'); b.textContent = t;
+      b.style.cssText = 'border:0;padding:8px 10px;cursor:pointer;background:' + (mobile ? '#2d333b;color:#e6edf3' : '#24292f;color:#fff'); return b; };
+    const on = btn('🔔 알림 켜기'), off = btn('×');
+    on.onclick = async () => {
+      bar.remove();
+      if (await Notification.requestPermission() === 'granted') subscribe().catch((e) => alert('알림 등록 실패: ' + e.message));
+    };
+    off.onclick = () => { bar.remove(); try { localStorage.setItem('cchat-push-hide', '1'); } catch (_) {} };
+    bar.append(on, off);
+    document.body.appendChild(bar);
+  };
+  setTimeout(pushSetup, 1500);
+
   // ttyd가 터미널을 새로 만들거나 설정을 덮어써도 0.5초 안에 기기별 색으로 되돌린다.
   const apply = () => {
     const term = window.term;

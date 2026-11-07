@@ -46,4 +46,7 @@ print -r -- "$(date '+%m-%d %T') $kind s=$s viewing=${viewing:-no}" >>$LOG
 [[ -n "$viewing" ]] && { refresh; exit 0; }
 $T set -t "=$s:" @unread "$kind"
 refresh
+# 선택: ~/.config/cchat/notify <세션> <done|ask> 가 있으면 백그라운드로 불러 폰·PC 알림을 보낸다(없으면 아무것도 안 함).
+N=~/.config/cchat/notify
+[[ -x $N ]] && { $N "$s" "$kind" </dev/null >/dev/null 2>&1 &! }
 exit 0
