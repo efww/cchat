@@ -74,9 +74,10 @@ Tell claude in any cchat tab, e.g. "make the blink faster" or "bigger font on my
 | `cchat-set` | Show current settings |
 | `cchat-set blink 1.5` | Blink period of working tabs, in seconds |
 | `cchat-set font phone 16` / `font pc off` | Font size per device (`off` = `FONT_SIZE`) |
+| `cchat-set theme pc dark` | Light/dark per device (default: PC light, phone dark) |
 | `cchat-set notify on\|off`, `notify pc\|phone\|done\|ask on\|off`, `quiet 01-08` | Notifications (needs a notify hook, see below) |
 
-Blink and font apply after a browser reload. Notifications: if `~/.config/cchat/notify` exists and is executable, cchat runs it as `notify <session> <done|ask|test>` (with `CCHAT_NOTIFY_DEVICES`) whenever a tab you are not looking at turns green or orange. cchat does not ship a push server; the hook can send to anything (web push, ntfy, Telegram…).
+Blink, font and theme apply after a browser reload. Notifications: if `~/.config/cchat/notify` exists and is executable, cchat runs it as `notify <session> <done|ask|test>` (with `CCHAT_NOTIFY_DEVICES`) whenever a tab you are not looking at turns green or orange. cchat does not ship a push server; the hook can send to anything (web push, ntfy, Telegram…).
 
 ## Remote access (read this)
 

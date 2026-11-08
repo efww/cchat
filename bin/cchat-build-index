@@ -107,7 +107,9 @@ SCRIPT = """<script id="cchat-script">
   const coarse = mq('(pointer: coarse)');
   const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '') || coarse
     || mq('(hover: none)') || Math.min(screen.width || 9999, innerWidth || 9999) <= 600;
-  const theme = mobile ? DARK : LIGHT;
+  // 테마: cchat-set theme pc|phone light|dark (기본 PC=라이트, 폰=다크)
+  const dark = (mobile ? SET.themePhone : SET.themePc) === 'dark';
+  const theme = dark ? DARK : LIGHT;
   const root = document.documentElement;
   root.dataset.cchatDevice = mobile ? 'mobile' : 'desktop';
   root.style.setProperty('--cchat-bg', theme.background);
@@ -484,7 +486,7 @@ SCRIPT = """<script id="cchat-script">
     if (!el) {
       const st = document.createElement('style');
       st.textContent = '#cchat-busy{position:fixed;inset:0;pointer-events:none;z-index:5}'
-        + '#cchat-busy div{position:fixed;pointer-events:none;background:' + (mobile ? 'rgba(255,255,255,.14)' : 'rgba(0,0,0,.13)')
+        + '#cchat-busy div{position:fixed;pointer-events:none;background:' + (dark ? 'rgba(255,255,255,.14)' : 'rgba(0,0,0,.13)')
         + '}';
       document.head.appendChild(st);
       el = document.createElement('div');
@@ -565,7 +567,7 @@ SCRIPT = """<script id="cchat-script">
     bar.style.cssText = 'position:fixed;top:8px;right:8px;z-index:20;display:flex;gap:2px;font:600 13px/1 system-ui,sans-serif;'
       + 'border-radius:8px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.25)';
     const btn = (t) => { const b = document.createElement('button'); b.textContent = t;
-      b.style.cssText = 'border:0;padding:8px 10px;cursor:pointer;background:' + (mobile ? '#2d333b;color:#e6edf3' : '#24292f;color:#fff'); return b; };
+      b.style.cssText = 'border:0;padding:8px 10px;cursor:pointer;background:' + (dark ? '#2d333b;color:#e6edf3' : '#24292f;color:#fff'); return b; };
     const on = btn('🔔 알림 켜기'), off = btn('×');
     on.onclick = async () => {
       bar.remove();
@@ -620,12 +622,14 @@ def fetch_base_index() -> str:
 
 
 def settings() -> dict:
-    """cchat-set 값 중 페이지가 쓰는 것: 깜빡임 한 주기(ms, 평소+짙게), 기기별 글자 크기(0=ttyd 기본)."""
+    """cchat-set 값 중 페이지가 쓰는 것: 깜빡임 한 주기(ms, 평소+짙게), 기기별 글자 크기(0=ttyd 기본), 기기별 테마."""
     try:
         blink = min(5.0, max(0.5, float(setting("blink", "1.5"))))
     except ValueError:
         blink = 1.5
-    return {"blinkMs": int(blink * 2000), "fontPc": font_px("font.pc"), "fontPhone": font_px("font.phone")}
+    theme = lambda k, d: setting(k, d) if setting(k, d) in ("light", "dark") else d
+    return {"blinkMs": int(blink * 2000), "fontPc": font_px("font.pc"), "fontPhone": font_px("font.phone"),
+            "themePc": theme("theme.pc", "light"), "themePhone": theme("theme.phone", "dark")}
 
 
 def main() -> None:

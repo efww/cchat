@@ -9,11 +9,12 @@
 #   cchat-set quiet 01-08|off          방해 금지 시간(시 단위, 이 시간엔 알림 안 보냄)
 #   cchat-set blink <초>               작업 중 탭 깜빡임 박자(0.5~5, 기본 1.5) — 브라우저 새로고침 필요
 #   cchat-set font pc|phone <px>|off   글자 크기(8~32, off=기본 @@FONT_SIZE@@) — 브라우저 새로고침 필요
+#   cchat-set theme pc|phone light|dark 색 테마(기본 PC=light, 폰=dark) — 브라우저 새로고침 필요
 # 내부용: cchat-set --devices-for <done|ask|test>  지금 알림을 보낼 기기 목록(없으면 빈 줄)
 F=@@HOME@@/.config/cchat/settings
 N=@@HOME@@/.config/cchat/notify
-typeset -A D=(notify on notify.pc on notify.phone on notify.done on notify.ask on quiet off blink 1.5 font.pc off font.phone off)
-ORDER=(notify notify.pc notify.phone notify.done notify.ask quiet blink font.pc font.phone)
+typeset -A D=(notify on notify.pc on notify.phone on notify.done on notify.ask on quiet off blink 1.5 font.pc off font.phone off theme.pc light theme.phone dark)
+ORDER=(notify notify.pc notify.phone notify.done notify.ask quiet blink font.pc font.phone theme.pc theme.phone)
 
 get() { local v; v=$(grep -m1 "^$1=" $F 2>/dev/null | cut -d= -f2-); print -r -- "${v:-${D[$1]}}"; }
 put() {
@@ -68,6 +69,9 @@ case "${1:-}" in
     [[ "${2:-}" == (pc|phone) ]] || { print -u2 "cchat-set font pc|phone <px>|off"; exit 2; }
     if [[ "${3:-}" == off ]] || { [[ "${3:-}" =~ '^[0-9]+$' ]] && (( $3 >= 8 && $3 <= 32 )); }; then put font.$2 $3; rebuild
     else print -u2 "8~32 또는 off"; exit 2; fi ;;
-  -h|--help|help) sed -n '2,13p' $0 | sed 's/^# \{0,1\}//' ;;
+  theme)
+    [[ "${2:-}" == (pc|phone) && "${3:-}" == (light|dark) ]] || { print -u2 "cchat-set theme pc|phone light|dark"; exit 2; }
+    put theme.$2 $3; rebuild ;;
+  -h|--help|help) sed -n '2,14p' $0 | sed 's/^# \{0,1\}//' ;;
   *) print -u2 "모르는 설정: $1 (cchat-set help)"; exit 2 ;;
 esac
