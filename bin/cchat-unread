@@ -61,8 +61,49 @@ case "$kind" in
     exit 0 ;;
   idle) [[ -n "$($T show -t "=$s:" -qv @busy)" ]] && { $T set -u -t "=$s:" @busy; $T set -u -t "=$s:" @busy_since; refresh; }; exit 0 ;;
 esac
+# 답이 글로 묻고 끝났으면("진행할까요?", "정해 주세요") 녹색이 아니라 주황(내 차례)으로 본다.
+# 질문 도구를 안 쓰고 글로 묻는 턴이 많아(11-09 대화 171턴 중 63턴) 주황이 거의 안 나오던 것.
+qdet=""
+if [[ $kind == done ]]; then
+  qdet=$(print -r -- "$input" | /usr/bin/python3 -I -c '
+import json, os, re, sys
+try:
+    d = json.loads(sys.stdin.read() or "{}")
+except Exception:
+    d = {}
+text = d.get("last_assistant_message") or ""
+if not text and d.get("transcript_path"):
+    try:
+        with open(os.path.expanduser(d["transcript_path"]), "rb") as f:
+            f.seek(0, 2); f.seek(max(0, f.tell() - 400000)); lines = f.read().decode("utf-8", "ignore").splitlines()
+        for l in reversed(lines):
+            o = json.loads(l) if l.startswith("{") else {}
+            if o.get("type") != "assistant" or o.get("isSidechain"): continue
+            t = [x.get("text", "") for x in (o.get("message", {}).get("content") or []) if isinstance(x, dict) and x.get("type") == "text"]
+            if any(x.strip() for x in t): text = "\n".join(t); break
+    except Exception:
+        pass
+last = [l.strip(" *_`>-") for l in text.strip().splitlines() if l.strip()][-2:]  # 마지막 두 줄(질문 뒤에 한 줄 덧붙이는 경우)
+# 결정을 묻는 문장만 본다: "?"·"~까요"로 끝남, "정해/골라/결정해/답해 주세요", "~할지(…) 말씀해/알려 주세요".
+# 인사성 마무리("원하시면/있으면/필요하면 …", "고칠 곳을 말씀해 주세요", "열어 봐 주세요")는 녹색 그대로.
+END = re.compile(r"(\?|까요)[\s.!)\"」”]*$")
+DECIDE = re.compile(r"(정해|골라|결정해|답해) ?(주세요|주시면|주셔야)|정하시면 됩니다")
+ASKWORD = re.compile(r"(말씀해|알려|정해|답해) ?(주세요|주시면|주셔야)")
+POLITE = re.compile(r"(있으면|있다면|필요하면|필요하시면|원하시면|궁금하|더 필요)")
+def rieul_ji(t):  # "할지·지울지·넣을지"처럼 ㄹ받침 + "지"(고르게 하는 말)
+    return any(t[k] == "지" and 0xAC00 <= ord(t[k - 1]) <= 0xD7A3 and (ord(t[k - 1]) - 0xAC00) % 28 == 8 for k in range(1, len(t)))
+def asks(t):
+    if POLITE.search(t): return False
+    return bool(END.search(t) or DECIDE.search(t) or (rieul_ji(t) and ASKWORD.search(t)))
+for l in reversed(last):
+    for sent in reversed(re.split(r"(?<=[.?!])\s+", l)):
+        if asks(sent):
+            print(sent[:120]); sys.exit()
+' 2>/dev/null)
+  [[ -n "$qdet" ]] && kind=ask
+fi
 $T set -u -t "=$s:" @busy
-[[ $kind == done ]] && $T set -u -t "=$s:" @busy_since
+[[ $kind == done || -n "$qdet" ]] && $T set -u -t "=$s:" @busy_since
 c=$(ctx_from_transcript); [[ -n "$c" ]] && $T set -t "=$s:" @ctx "$c"
 now=$(date +%s)
 focus_idle=$($T show -gqv @cchat_focus_idle)  # 기본 600초(시험에서 줄임)
@@ -74,7 +115,7 @@ while read -r sess act flags; do
   if { [[ ",$flags," == *,focused,* ]] && (( now - act < ${focus_idle:-600} )); } || (( now - act < ${view_idle:-120} )); then viewing=yes; break; fi
 done < <($T list-clients -F '#{client_session} #{client_activity} #{client_flags}')
 LOG=@@HOME@@/Library/Logs/cchat-unread.log
-print -r -- "$(date '+%m-%d %T') $kind s=$s viewing=${viewing:-no}" >>$LOG
+print -r -- "$(date '+%m-%d %T') $kind${qdet:+(글 질문)} s=$s viewing=${viewing:-no}" >>$LOG
 [[ -n "$viewing" ]] && { refresh; exit 0; }
 $T set -t "=$s:" @unread "$kind"
 refresh
@@ -104,6 +145,7 @@ else:
     # claude 답은 맨 앞 칸부터 "● "로 시작한다(입력칸 위 오른쪽의 "● high · /effort" 같은 표시는 앞에 공백이 있다)
     out = next((l[2:].strip() for l in reversed(raw) if l.startswith("● ")), "")
 print(out[:120])' "$kind")
+      [[ -n "$qdet" ]] && det=$qdet  # 글로 물은 질문이면 그 문장을 알림에 그대로
       act=""
       [[ $kind == ask && "$scr" == *"Do you want"* ]] && act=1
       CCHAT_NOTIFY_DEVICES="$devs" CCHAT_NOTIFY_DETAIL="$det" CCHAT_NOTIFY_ACTIONS="$act" CCHAT_NOTIFY_PANE="$TMUX_PANE" $N "$s" "$kind"
