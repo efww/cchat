@@ -203,18 +203,31 @@ def clip(text, room):
 _meta = None
 
 
+def setting(key, default):
+    """cchat-set이 쓰는 @@HOME@@/.config/cchat/settings(key=value)에서 값 하나."""
+    try:
+        for line in open(os.path.expanduser("@@HOME@@/.config/cchat/settings")):
+            k, _, v = line.strip().partition("=")
+            if k == key:
+                return v
+    except OSError:
+        pass
+    return default
+
+
 def meta(name):
     """탭 아래 줄 끝 숫자: 작업 중이면 걸린 시간(3m), 아니면 대화 크기(42k). 한 번의 tmux 호출로 모든 대화 값을 읽는다."""
     global _meta
     if _meta is None:
         _meta = {}
         now = int(time.time())
+        show_ctx = setting("tab.ctx", "on") == "on"
         for line in tmux("list-sessions", "-F", "#{session_name}\t#{@busy}\t#{@busy_since}\t#{@ctx}").splitlines():
             n, busy, since, ctx = (line.split("\t") + ["", "", "", ""])[:4]
             if busy and since.isdigit():
                 el = max(0, now - int(since))
                 _meta[n] = f"{el // 60}m" if el >= 60 else f"{el}s"
-            elif ctx:
+            elif ctx and show_ctx:
                 _meta[n] = ctx
     return _meta.get(name, "")
 

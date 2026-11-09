@@ -17,7 +17,7 @@ case "$1" in
     cd "$WORKDIR" || exit 1
     # --loop <claude 세션 id>: 처음 한 번은 그 대화를 이어서 연다(설정을 다시 읽히려고 대화를 다시 띄울 때).
     # cchat 설정을 말로 바꿀 수 있게 claude에게 cchat-set을 알려 준다.
-    CCHAT_HINT='This session runs inside cchat (a browser terminal with session tabs). When the user asks to change cchat settings (notifications on/off per device pc/phone or per kind done/ask, quiet hours, tab blink speed, font size, light/dark theme per device), use the `cchat-set` command (`cchat-set help` lists options; `cchat-set` shows current values). Tab names: `cchat-label`. Other cchat helpers: `cchat-send <from> <to> [prefix]` puts one session's last answer into another session's input (e.g. pass the result of tab 1 to tab 2), `cchat-history [query]` / `cchat-history open <n>` finds and reopens closed conversations, `cchat-snip add "<text>"` saves a reusable prompt for the phone ✎ button.'
+    CCHAT_HINT='This session runs inside cchat (a browser terminal with session tabs). When the user asks to change cchat settings (notifications on/off per device pc/phone or per kind done/ask, quiet hours, tab blink speed, font size, light/dark theme per device, conversation size shown on tabs), use the `cchat-set` command (`cchat-set help` lists options; `cchat-set` shows current values). Tab names: `cchat-label`. Other cchat helpers: `cchat-send <from> <to> [prefix]` puts one session's last answer into another session's input (e.g. pass the result of tab 1 to tab 2), `cchat-history [query]` / `cchat-history open <n>` finds and reopens closed conversations, `cchat-snip add "<text>"` saves a reusable prompt for the phone ✎ button.'
     resume=()
     [[ "$2" == [0-9a-f]##-[0-9a-f-]## ]] && resume=(--resume "$2")
     while true; do
