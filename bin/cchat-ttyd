@@ -1,0 +1,12 @@
+#!/bin/zsh
+# cchat: launchd(@@LAUNCHD_PREFIX@@.ttyd)가 ttyd 대신 부르는 시작 래퍼.
+# index.html은 그때 설치된 ttyd의 기본 페이지(JS 포함)를 굽는다. brew upgrade로 ttyd가 바뀐 뒤 그대로 띄우면
+# 새 서버가 옛 화면 코드를 내보내 깨질 수 있어서, 페이지를 만든 버전과 지금 버전이 다르면 먼저 다시 만든다.
+v=$(@@BREW@@/ttyd --version 2>/dev/null | awk '{print $NF}')
+if [[ "$v" != "$(cat @@HOME@@/.config/cchat/index.ttyd-version 2>/dev/null)" ]]; then
+  print -r -- "$(date '+%F %T') ttyd ${v:-?}: index.html 다시 만듦"
+  @@HOME@@/.local/bin/cchat-build-index
+fi
+# KEEP_AWAKE=1: 밖에서 폰으로 붙어 있는 동안 맥이 잠들어 통로가 끊기지 않게 한다(뚜껑을 닫으면 전원·외부 화면 없이는 잠든다).
+[[ "@@KEEP_AWAKE@@" == 1 ]] && exec /usr/bin/caffeinate -is @@BREW@@/ttyd "$@"
+exec @@BREW@@/ttyd "$@"

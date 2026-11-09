@@ -1,7 +1,7 @@
 #!/bin/zsh
 # cchat: ttyd가 브라우저 연결마다 'cchat-session attach [이름]'으로 실행한다.
 #   이름은 URL의 ?arg=이름 (예: @@PUBLIC_URL@@?arg=work). 없으면 main.
-#   attach [이름] -> cchat 전용 tmux 서버(-L cchat)에서 그 이름의 대화에 붙는다(없으면 새로 만든다).
+#   attach [이름] -> cchat 전용 tmux 서버(-L @@TMUX_SOCKET@@)에서 그 이름의 대화에 붙는다(없으면 새로 만든다).
 #   --loop [id]   -> tmux 안에서 claude 실행(id를 주면 처음엔 그 대화를 이어서). /exit(정상 종료)면 대화를 닫고, 비정상 종료면 Enter=다시 시작, q=닫기.
 export PATH="@@HOME@@/.local/bin:@@BREW@@:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 export LANG="${LANG:-en_US.UTF-8}"
@@ -9,7 +9,7 @@ export COLORTERM=truecolor
 setopt extendedglob
 WORKDIR=@@WORKDIR@@
 PERMISSION_MODE=@@PERMISSION_MODE@@
-TMUX_CMD=(@@BREW@@/tmux -L cchat -f @@HOME@@/.config/cchat/tmux.conf)
+TMUX_CMD=(@@BREW@@/tmux -L @@TMUX_SOCKET@@ -f @@HOME@@/.config/cchat/tmux.conf)
 NAME_RE='^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$'
 
 case "$1" in
@@ -17,11 +17,11 @@ case "$1" in
     cd "$WORKDIR" || exit 1
     # --loop <claude 세션 id>: 처음 한 번은 그 대화를 이어서 연다(설정을 다시 읽히려고 대화를 다시 띄울 때).
     # cchat 설정을 말로 바꿀 수 있게 claude에게 cchat-set을 알려 준다.
-    CCHAT_HINT='This session runs inside cchat (a browser terminal with session tabs). When the user asks to change cchat settings (notifications on/off per device pc/phone or per kind done/ask, quiet hours, tab blink speed, font size, light/dark theme per device), use the `cchat-set` command (`cchat-set help` lists options; `cchat-set` shows current values). Tab names: `cchat-label`.'
+    CCHAT_HINT='This session runs inside cchat (a browser terminal with session tabs). When the user asks to change cchat settings (notifications on/off per device pc/phone or per kind done/ask, quiet hours, tab blink speed, font size, light/dark theme per device), use the `cchat-set` command (`cchat-set help` lists options; `cchat-set` shows current values). Tab names: `cchat-label`. Other cchat helpers: `cchat-send <from> <to> [prefix]` puts one session's last answer into another session's input (e.g. pass the result of tab 1 to tab 2), `cchat-history [query]` / `cchat-history open <n>` finds and reopens closed conversations, `cchat-snip add "<text>"` saves a reusable prompt for the phone ✎ button.'
     resume=()
     [[ "$2" == [0-9a-f]##-[0-9a-f-]## ]] && resume=(--resume "$2")
     while true; do
-      claude --permission-mode "$PERMISSION_MODE" --settings @@HOME@@/.config/cchat/claude-settings.json \
+      @@CLAUDE_BIN@@ --permission-mode "$PERMISSION_MODE" --settings @@HOME@@/.config/cchat/claude-settings.json \
         --append-system-prompt "$CCHAT_HINT" "${resume[@]}"
       resume=()
       # /exit 처럼 정상 종료(0)면 바로 이 대화를 닫는다. 비정상 종료일 때만 아래에서 물어본다.

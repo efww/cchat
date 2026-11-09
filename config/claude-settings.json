@@ -69,6 +69,18 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "@@HOME@@/.local/bin/cchat-unread resume",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   }
 }

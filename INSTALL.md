@@ -62,6 +62,8 @@ Tell the user:
 - Alt+number / Alt+←→ switch tabs on desktop; tap a tab on a phone.
 - Green = done, orange = waiting for them, blinking gray = working.
 - Logs: `~/Library/Logs/cchat-ttyd.log`.
+- Settings are changed by just asking claude in any tab (e.g. "make the phone font bigger"); it uses `cchat-set`.
+- Notifications: optional, see `examples/notify-ntfy` (ask the user before setting one up).
 
 ## 5. Remote access (only if the user asks)
 
@@ -70,6 +72,7 @@ ttyd has **no authentication**. Never expose the port directly. The supported wa
 1. The user needs a server they reach with `ssh <host>` (key login, no password prompt) and an authenticating reverse proxy on it (e.g. Cloudflare Access, oauth2-proxy) that forwards to `127.0.0.1:<TUNNEL_REMOTE_PORT>` on that server.
 2. Set `TUNNEL_HOST=<host>` and `TUNNEL_REMOTE_PORT` in `my.conf`, run `./install.sh -c my.conf` again. This adds the `…tunnel` launchd service (a reverse SSH tunnel).
 3. Set `PUBLIC_URL` to the proxied URL.
+4. Set `KEEP_AWAKE=1` so the Mac does not fall asleep while it is used remotely (a sleeping Mac drops the tunnel). On a laptop, also mention that closing the lid still sleeps it unless it is on power with an external display; `sudo pmset -c sleep 0` (user's decision) keeps it awake on power.
 
 Explain this to the user and let them set up the server side; do not configure their server without being asked.
 

@@ -13,7 +13,7 @@ Claude Code를 브라우저(PC·폰)에서 쓰는 웹 터미널. 맥 한 대에�
 - **내 맥의 진짜 Claude Code.** 내 파일·도구·설정 그대로. 폰엔 설치할 것 없이 브라우저만.
 
 **한계**
-- 푸시 알림이 없다. 색은 페이지를 열어 둘 때만 보인다.
+- 알림은 직접 고른 작은 훅이 보낸다([ntfy](examples/notify-ntfy)·[macOS](examples/notify-macos) 예시 포함). 푸시 서버는 들어 있지 않다.
 - macOS 전용이고, 맥이 켜져 있어야 한다.
 - 밖에서 접속하려면 통로와 인증을 직접 갖춰야 한다.
 
@@ -50,9 +50,13 @@ open "http://127.0.0.1:7681/cchat/?arg=1"
   - 검정 = 지금 보는 대화
   - 녹색 = 답이 끝났는데 아직 안 본 대화
   - 주황 = 허락·질문을 기다리는 대화
-  - 회색 깜빡임(1.5초) = 작업 중(여러 탭이 같은 박자로)
-- **PC 단축키**: Alt(Option)+숫자 = 그 번호 대화, Alt+←/→ = 이전/다음. Ctrl+V는 PC 클립보드를 붙인다.
-- **폰**: 손가락 드래그 스크롤, 키 바(Esc·Tab·화살표 등), 다크 테마.
+  - 회색 깜빡임 = 작업 중(여러 탭이 같은 박자로)
+  - 이름표 줄 끝 숫자: 작업 중이면 걸린 시간(`3m`), 끝나면 대화 크기(`42k` 토큰)
+  - 끝의 **+** 는 새 대화. 탭이 넘치면 ◀ ▶에 숨은 확인할 탭 수(`▶2`)
+- **PC 단축키**: Alt(Option)+숫자 = 그 번호 대화, Alt+←/→ = 이전/다음, Alt+A = 확인할 다음 탭, Alt+O = 전체 모아보기. Ctrl+V는 PC 클립보드를 붙인다.
+- **폰**: 손가락 드래그 스크롤, 좌우로 밀어 탭 바꾸기, 다크 테마. 키 바: ★ = 확인할 다음 탭, Esc·Tab·화살표, ⋯ = 모아보기·음성 입력·저장한 지시문(✎)·사진/파일 올리기(📎, 원격 중계가 있을 때).
+- **한 번에 승인**: claude가 번호 선택지(허락·질문)를 띄우면 번호가 버튼으로 뜬다.
+- **claude에게 시킬 수 있는 도구**: `cchat-send 1 2`(1번 마지막 답을 2번 입력칸에), `cchat-history`(닫은 대화 찾아 다시 열기), `cchat-snip`(지시문 저장), `cchat-label`(탭 이름), `cchat-set`(설정).
 - 대화는 tmux 안에 있어 브라우저를 닫아도 계속 돈다. URL `?arg=이름`으로 그 이름의 대화에 붙는다(없으면 만든다).
 
 ## 사용법
@@ -77,7 +81,7 @@ cchat 탭 아무 데서나 claude에게 "깜빡임 좀 빠르게", "폰 글자 �
 | `cchat-set theme pc dark` | 기기별 라이트/다크(기본 PC 라이트, 폰 다크) |
 | `cchat-set notify on\|off`, `notify pc\|phone\|done\|ask on\|off`, `quiet 01-08` | 알림(알림 훅 필요, 아래) |
 
-깜빡임·글자 크기·테마는 브라우저 새로고침 뒤 적용됩니다. 알림: `~/.config/cchat/notify`가 실행 파일로 있으면, 보고 있지 않은 탭이 녹색·주황이 될 때 `notify <세션> <done|ask|test>`로 부릅니다(`CCHAT_NOTIFY_DEVICES` 함께). 푸시 서버는 들어 있지 않고, 훅에서 웹 푸시·ntfy·텔레그램 등 원하는 곳으로 보내면 됩니다.
+깜빡임·글자 크기·테마는 브라우저 새로고침 뒤 적용됩니다. 알림: `~/.config/cchat/notify`가 실행 파일로 있으면, 보고 있지 않은 탭이 녹색·주황이 될 때 `notify <세션> <done|ask|test>`로 부릅니다(`CCHAT_NOTIFY_DEVICES` 함께). 푸시 서버는 들어 있지 않고, 훅에서 웹 푸시·ntfy·텔레그램 등 원하는 곳으로 보내면 됩니다. 바로 쓰기: `cp examples/notify-ntfy ~/.config/cchat/notify`(안의 `TOPIC` 수정) 후 `cchat-set notify test`.
 
 ## 밖에서 접속할 때 (주의)
 
@@ -93,6 +97,10 @@ ttyd는 127.0.0.1에만 열리고 **자체 인증이 없다**. 밖에서 쓰려�
 | `bin/cchat-unread` | claude 훅(완료·허락·작업 시작)에서 탭 색 표시 |
 | `bin/cchat-build-index` | ttyd 기본 화면에 cchat 부분(테마, 폰 키 바·스크롤, 단축키, 깜빡임)을 넣어 `index.html` 생성 |
 | `bin/cchat-set` | 설정 보기·바꾸기(`~/.config/cchat/settings`) |
+| `bin/cchat-send` · `bin/cchat-history` · `bin/cchat-snip` | 탭 사이 답 넘기기 · 닫은 대화 다시 열기 · 지시문 저장 |
+| `bin/cchat-ttyd` | ttyd 시작(ttyd 업그레이드 뒤 페이지 다시 만들기, `KEEP_AWAKE=1`이면 맥 잠자기 막기) |
+| `bin/cchat-inbox` | (선택, `INBOX_REMOTE`) 폰에서 올린 파일 가져오기 |
+| `examples/` | 알림 훅 예시(ntfy, macOS) |
 | `bin/cchat-label` | 대화 이름표 직접 달기 |
 | `bin/cchat-tunnel` | (선택) SSH 역방향 통로 |
 | `bin/cchat-update` | (선택) 매일 claude CLI 업데이트 |

@@ -5,52 +5,109 @@
 # busy(UserPromptSubmit 훅) = 작업 중 → @busy=1(탭이 은은하게 깜빡임(박자 cchat-set blink), 브라우저가 그림).
 # idle(Notification idle_prompt 훅, 입력 대기 1분쯤) = 작업 중 표시만 끈다(Esc로 중단하면 Stop이 안 와서 남는 것 정리).
 # done/ask는 작업 중 표시를 끄고 위 규칙대로 색을 켠다.
-# "보고 있음" = 그 대화를 띄운 화면 중 하나가 포커스를 가졌거나(client_flags의 focused) 2분 안에 입력(키·탭·스크롤)이 있었음.
+# "보고 있음" = 그 대화를 띄운 화면 중 하나가 2분 안에 입력(키·탭·스크롤)이 있었거나, 포커스를 가졌고(client_flags의 focused) 10분 안에 입력이 있었음.
 #   예전엔 "가장 최근에 입력한 화면의 대화"만 봤더니, 브라우저를 뒤로 보내 두고 자리를 비운 사이 그 대화가 끝나면 표시가 안 됐다.
-cat >/dev/null
+input=$(cat)  # 훅 입력 JSON(transcript_path 등)
 kind=${1:-done}
-[[ "$TMUX" == */cchat,* && -n "$TMUX_PANE" ]] || exit 0
-T=(@@BREW@@/tmux -L cchat)
+[[ "$TMUX" == */@@TMUX_SOCKET@@,* && -n "$TMUX_PANE" ]] || exit 0
+T=(@@BREW@@/tmux -L @@TMUX_SOCKET@@)
 s=$($T display -p -t "$TMUX_PANE" '#{session_name}') || exit 0
 refresh() { $T list-clients -F '#{client_name}' | while read -r c; do $T refresh-client -t "$c" -S; done; }
+if [[ "$kind" == resume ]]; then
+  # PostToolUse 훅(도구 하나 끝날 때마다): 허락하거나 질문에 답한 뒤 claude가 계속 일하는데 작업 중 표시가 꺼져 있던 것을 다시 켠다.
+  # 이미 켜져 있으면 아무것도 안 한다(도구마다 불려서 가볍게). 아직 남은 주황(ask) 표시도 지운다.
+  [[ "$($T show -t "=$s:" -qv @unread)" == ask ]] && { $T set -u -t "=$s:" @unread; refresh; }
+  [[ -n "$($T show -t "=$s:" -qv @busy)" ]] && exit 0
+  kind=busy
+fi
+# 탭에 보일 숫자: 작업 시작 시각(@busy_since → "3m"), 끝나면 지금 대화 크기(@ctx → "42k", 마지막 응답의 입력 토큰 합).
+ctx_from_transcript() {
+  print -r -- "$input" | /usr/bin/python3 -I -c '
+import json, os, sys
+try:
+    p = json.loads(sys.stdin.read() or "{}").get("transcript_path") or ""
+    with open(os.path.expanduser(p), "rb") as f:
+        f.seek(0, 2); f.seek(max(0, f.tell() - 400000)); lines = f.read().decode("utf-8", "ignore").splitlines()
+    for l in reversed(lines):
+        if "\"usage\"" not in l: continue
+        u = json.loads(l).get("message", {}).get("usage") or {}
+        n = sum(u.get(k, 0) for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"))
+        if n: print(f"{round(n / 1000)}k"); break
+except Exception:
+    pass'
+}
 case "$kind" in
   busy)
+    [[ -n "$($T show -t "=$s:" -qv @busy_since)" ]] || $T set -t "=$s:" @busy_since "$(date +%s)"
     $T set -t "=$s:" @busy 1; refresh
     # Esc로 중단하면 Stop 훅이 안 와서 작업 중 표시가 남는다(idle_prompt 알림도 안 옴, 2026-11-06 확인).
-    # 그래서 작업 중인 동안 15초마다 화면을 보고, claude의 진행 표시줄("… (12s ·" 같은 것)이 두 번 연속 없으면 끈다.
-    pidf=~/.cache/cchat-busy/$s.pid; mkdir -p ${pidf:h}
+    # 그래서 작업 중인 동안 15초마다 화면을 보고, claude의 진행 표시줄("… (12s ·" 같은 것)도 없고 화면도 그대로인 게
+    # 두 번 연속이면 끈다. 화면 변화도 보는 건 claude 업데이트로 진행 표시 문구가 바뀌어도 작업 중을 놓치지 않게 하려는 것.
+    pidf=@@HOME@@/.cache/cchat-busy/$s.pid; mkdir -p ${pidf:h}
     if ! { [[ -f $pidf ]] && kill -0 "$(<$pidf)" 2>/dev/null; }; then
       (
-        miss=0
-        while sleep 15; do
+        miss=0 last=""
+        while sleep ${CCHAT_BUSY_POLL:-15}; do
           [[ -n "$($T show -t "=$s:" -qv @busy 2>/dev/null)" ]] || break
-          if $T capture-pane -p -t "$TMUX_PANE" 2>/dev/null | grep -qE '… \(([0-9]+h )?([0-9]+m )?[0-9]+s'; then miss=0
-          else (( ++miss >= 2 )) && { $T set -u -t "=$s:" @busy; refresh; break; }; fi
+          scr=$($T capture-pane -p -t "$TMUX_PANE" 2>/dev/null | sed '$d' | sed '$d')  # 맨 아래 2줄(상태줄: 시계 등)은 빼고 비교
+          if print -r -- "$scr" | grep -qE '… \(([0-9]+h )?([0-9]+m )?[0-9]+s|esc to interrupt' || [[ -n "$last" && "$scr" != "$last" ]]; then miss=0
+          else (( ++miss >= 2 )) && { $T set -u -t "=$s:" @busy; $T set -u -t "=$s:" @busy_since; refresh; print -r -- "$(date '+%m-%d %T') busy-off s=$s (진행 표시·화면 변화 없음)" >>@@HOME@@/Library/Logs/cchat-unread.log; break; }; fi
+          last=$scr
         done
         rm -f $pidf
       ) </dev/null >/dev/null 2>&1 &!
       print $! > $pidf
     fi
     exit 0 ;;
-  idle) [[ -n "$($T show -t "=$s:" -qv @busy)" ]] && { $T set -u -t "=$s:" @busy; refresh; }; exit 0 ;;
+  idle) [[ -n "$($T show -t "=$s:" -qv @busy)" ]] && { $T set -u -t "=$s:" @busy; $T set -u -t "=$s:" @busy_since; refresh; }; exit 0 ;;
 esac
 $T set -u -t "=$s:" @busy
+[[ $kind == done ]] && $T set -u -t "=$s:" @busy_since
+c=$(ctx_from_transcript); [[ -n "$c" ]] && $T set -t "=$s:" @ctx "$c"
 now=$(date +%s)
+focus_idle=$($T show -gqv @cchat_focus_idle)  # 기본 600초(시험에서 줄임)
+view_idle=$($T show -gqv @cchat_view_idle)    # 기본 120초
 viewing=""
 while read -r sess act flags; do
   [[ "$sess" == "$s" ]] || continue
-  if [[ ",$flags," == *,focused,* ]] || (( now - act < 120 )); then viewing=yes; break; fi
+  # 포커스만 있고 10분 넘게 입력이 없으면 자리를 비운 것으로 본다(창을 띄워 둔 채 나가면 표시·알림이 다 막히던 것).
+  if { [[ ",$flags," == *,focused,* ]] && (( now - act < ${focus_idle:-600} )); } || (( now - act < ${view_idle:-120} )); then viewing=yes; break; fi
 done < <($T list-clients -F '#{client_session} #{client_activity} #{client_flags}')
-LOG=~/Library/Logs/cchat-unread.log
+LOG=@@HOME@@/Library/Logs/cchat-unread.log
 print -r -- "$(date '+%m-%d %T') $kind s=$s viewing=${viewing:-no}" >>$LOG
 [[ -n "$viewing" ]] && { refresh; exit 0; }
 $T set -t "=$s:" @unread "$kind"
 refresh
 # 선택: ~/.config/cchat/notify <세션> <done|ask> 가 있으면 백그라운드로 불러 폰·PC 알림을 보낸다(없으면 아무것도 안 함).
 # 보낼지·어느 기기로 보낼지는 cchat-set 설정(알림 켜기/끄기, 기기·종류별, 방해 금지 시간)을 따른다.
-N=~/.config/cchat/notify
+N=@@HOME@@/.config/cchat/notify
+# 훅에는 무엇을 묻는지(ask: 허락 창 위 줄들) 또는 마지막 답 한 줄(done: "● …")을 CCHAT_NOTIFY_DETAIL로 넘기고,
+# 도구 허락 창("Do you want …")이면 CCHAT_NOTIFY_ACTIONS=1(알림에서 허용·거절)과 그 칸(CCHAT_NOTIFY_PANE)을 넘긴다.
 if [[ -x $N ]]; then
   devs=$(@@HOME@@/.local/bin/cchat-set --devices-for "$kind")
-  [[ -n "$devs" ]] && { CCHAT_NOTIFY_DEVICES="$devs" $N "$s" "$kind" </dev/null >/dev/null 2>&1 &! }
+  if [[ -n "$devs" ]]; then
+    (
+      [[ $kind == ask ]] && sleep 1.5  # 허락 창이 그려진 뒤에 읽는다(훅은 창보다 먼저 불린다)
+      scr=$($T capture-pane -p -t "$TMUX_PANE" 2>/dev/null)
+      det=$(print -r -- "$scr" | /usr/bin/python3 -I -c '
+import re, sys
+kind = sys.argv[1]
+raw = sys.stdin.read().splitlines()
+lines = [l.strip(" │|╭╮╰╯\t") for l in raw]
+lines = [l for l in lines if l and not re.fullmatch(r"[\u2500-\u257f\-=_ ]+", l)]  # 가로선·점선(╌) 줄 빼기
+out = ""
+if kind == "ask":
+    i = next((k for k, l in enumerate(lines) if l.startswith("Do you want") or re.match(r"^(❯\s*)?1\.\s", l)), None)
+    if i:
+        out = " · ".join(lines[max(0, i - 2):i])
+else:
+    # claude 답은 맨 앞 칸부터 "● "로 시작한다(입력칸 위 오른쪽의 "● high · /effort" 같은 표시는 앞에 공백이 있다)
+    out = next((l[2:].strip() for l in reversed(raw) if l.startswith("● ")), "")
+print(out[:120])' "$kind")
+      act=""
+      [[ $kind == ask && "$scr" == *"Do you want"* ]] && act=1
+      CCHAT_NOTIFY_DEVICES="$devs" CCHAT_NOTIFY_DETAIL="$det" CCHAT_NOTIFY_ACTIONS="$act" CCHAT_NOTIFY_PANE="$TMUX_PANE" $N "$s" "$kind"
+    ) </dev/null >/dev/null 2>&1 &!
+  fi
 fi
 exit 0

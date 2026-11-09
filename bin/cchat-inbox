@@ -1,0 +1,8 @@
+#!/bin/zsh
+# 폰에서 올린 파일 가져오기: 페이지의 📎가 원격 중계에 올린 뒤 Alt+U를 보내면 tmux가 이걸 부른다(run-shell -b).
+# 중계 쪽 폴더(설정 INBOX_REMOTE="호스트:폴더", 비우면 아무것도 안 함)의 파일을 @@WORKDIR@@/.cchat-inbox/ 로 옮긴다.
+R="@@INBOX_REMOTE@@"
+[[ -n "$R" ]] || exit 0
+dest=@@WORKDIR@@/.cchat-inbox; mkdir -p $dest
+/usr/bin/ssh -o BatchMode=yes -o ConnectTimeout=8 ${R%%:*} "cd ${R#*:} 2>/dev/null && ls | head -50 | tar cf - -T - && ls | head -50 | xargs rm -f" | tar xf - -C $dest 2>/dev/null
+print -r -- "$(date '+%m-%d %T') inbox: $(ls $dest | wc -l | tr -d ' ') files" >> @@HOME@@/Library/Logs/cchat-unread.log

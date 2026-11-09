@@ -1,0 +1,9 @@
+#!/bin/zsh
+# cchat 알림 훅 예시: ntfy(https://ntfy.sh)로 폰·PC에 푸시. 설치:
+#   cp examples/notify-ntfy ~/.config/cchat/notify && chmod +x ~/.config/cchat/notify
+#   폰에 ntfy 앱을 깔고 아래 TOPIC을 구독(남이 못 맞힐 긴 이름으로 바꿀 것).
+# cchat이 부르는 형식: notify <세션> <done|ask|test>  (환경 CCHAT_NOTIFY_DEVICES: 켜 둔 기기 목록, 여기선 무시)
+TOPIC=${CCHAT_NTFY_TOPIC:-cchat-change-me-to-something-long}
+s=$1 kind=$2
+case $kind in ask) msg="확인을 기다려요 / waiting for you" ;; test) msg="test" ;; *) msg="끝났어요 / done" ;; esac
+/usr/bin/curl -s -m 8 -H "Title: cchat $s" -H "Tags: $kind" -d "$msg" "https://ntfy.sh/$TOPIC" >/dev/null

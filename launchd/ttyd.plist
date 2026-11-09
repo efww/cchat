@@ -15,13 +15,13 @@
 	<string>@@LAUNCHD_PREFIX@@.ttyd</string>
 	<key>ProgramArguments</key>
 	<array>
-		<string>@@BREW@@/ttyd</string>
+		<string>@@HOME@@/.local/bin/cchat-ttyd</string>
 		<string>-i</string>
 		<string>lo0</string>
 		<string>-p</string>
 		<string>@@PORT@@</string>
 		<string>-b</string>
-		<string>/cchat</string>
+		<string>@@BASE_PATH@@</string>
 		<string>-W</string>
 		<string>-a</string>
 		<string>-t</string>
@@ -30,6 +30,8 @@
 		<string>fontSize=@@FONT_SIZE@@</string>
 		<string>-t</string>
 		<string>disableLeaveAlert=true</string>
+		<string>-t</string>
+		<string>disableResizeOverlay=true</string>
 		<string>-I</string>
 		<string>@@HOME@@/.config/cchat/index.html</string>
 		<string>@@HOME@@/.local/bin/cchat-session</string>

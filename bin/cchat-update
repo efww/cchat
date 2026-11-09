@@ -3,8 +3,8 @@
 # 이미 실행 중인 claude 세션은 그대로 두며, 새 버전은 claude를 다시 시작할 때 적용된다.
 export PATH="@@HOME@@/.local/bin:@@BREW@@:/usr/bin:/bin:/usr/sbin:/sbin"
 unset DISABLE_AUTOUPDATER
-before=$(readlink @@HOME@@/.local/bin/claude)
-out=$(@@HOME@@/.local/bin/claude update </dev/null 2>&1); rc=$?
-after=$(readlink @@HOME@@/.local/bin/claude)
+before=$(readlink @@CLAUDE_BIN@@)
+out=$(@@CLAUDE_BIN@@ update </dev/null 2>&1); rc=$?
+after=$(readlink @@CLAUDE_BIN@@)
 print -r -- "$(date '+%F %T') rc=$rc ${before:t} -> ${after:t} | ${out//$'\n'/ / }"
 exit $rc

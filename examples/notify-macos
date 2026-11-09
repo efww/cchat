@@ -1,0 +1,7 @@
+#!/bin/zsh
+# cchat 알림 훅 예시: 이 맥 화면에 알림(밖에서는 안 보임 — 맥 앞에서 다른 일 할 때용). 설치:
+#   cp examples/notify-macos ~/.config/cchat/notify && chmod +x ~/.config/cchat/notify
+# cchat이 부르는 형식: notify <세션> <done|ask|test>
+s=$1 kind=$2
+case $kind in ask) msg="waiting for you" ;; test) msg="test" ;; *) msg="done" ;; esac
+/usr/bin/osascript -e "display notification \"$msg\" with title \"cchat $s\""

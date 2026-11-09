@@ -13,7 +13,7 @@ A browser front-end (desktop and phone) for [Claude Code](https://docs.anthropic
 - **Your real Claude Code.** Runs on your own Mac with your files, tools and settings. Nothing to install on the phone — just a browser.
 
 **Limits**
-- No push notifications: colors show only while the page is open.
+- Notifications need a small hook you choose (examples for [ntfy](examples/notify-ntfy) and [macOS](examples/notify-macos) included); no push server is bundled.
 - macOS only, and the Mac must stay on.
 - Remote access needs your own tunnel + authentication.
 
@@ -50,9 +50,13 @@ Update: `git pull && ./install.sh -c my.conf`. Uninstall and details: [INSTALL.m
   - Black = the session you are viewing
   - Green = finished replying, not seen yet
   - Orange = waiting for your permission or answer
-  - Blinking gray (1.5 s) = working (all working tabs blink in sync)
-- **Desktop shortcuts**: Alt(Option)+number = go to that session, Alt+←/→ = previous/next. Ctrl+V pastes your local (browser) clipboard.
-- **Phone**: finger-drag scrolling, a key bar (Esc, Tab, arrows, …), dark theme.
+  - Blinking gray = working (all working tabs blink in sync)
+  - The label row ends with the time a working tab has been busy (`3m`) or the conversation size (`42k` tokens)
+  - **+** at the end opens a new session; when tabs overflow, ◀ ▶ show how many hidden tabs need you (`▶2`)
+- **Desktop shortcuts**: Alt(Option)+number = go to that session, Alt+←/→ = previous/next, Alt+A = next tab that needs you, Alt+O = overview of all sessions. Ctrl+V pastes your local (browser) clipboard.
+- **Phone**: finger-drag scrolling, swipe left/right to change tabs, dark theme. Key bar: ★ = next tab that needs you, Esc, Tab, arrows, ⋯ = overview, voice input, saved prompts (✎), photo/file upload (📎, remote relay only).
+- **Approve with one tap**: when claude shows a numbered choice (permission, question), the numbers appear as buttons.
+- **Helpers you can ask claude to use**: `cchat-send 1 2` (pass tab 1's last answer to tab 2's input), `cchat-history` (find and reopen closed conversations), `cchat-snip` (saved prompts), `cchat-label` (tab names), `cchat-set` (settings).
 - Sessions live inside tmux, so they keep running after you close the browser. Open the URL with `?arg=name` to attach to that session (created if missing).
 
 ## How to use
@@ -77,7 +81,7 @@ Tell claude in any cchat tab, e.g. "make the blink faster" or "bigger font on my
 | `cchat-set theme pc dark` | Light/dark per device (default: PC light, phone dark) |
 | `cchat-set notify on\|off`, `notify pc\|phone\|done\|ask on\|off`, `quiet 01-08` | Notifications (needs a notify hook, see below) |
 
-Blink, font and theme apply after a browser reload. Notifications: if `~/.config/cchat/notify` exists and is executable, cchat runs it as `notify <session> <done|ask|test>` (with `CCHAT_NOTIFY_DEVICES`) whenever a tab you are not looking at turns green or orange. cchat does not ship a push server; the hook can send to anything (web push, ntfy, Telegram…).
+Blink, font and theme apply after a browser reload. Notifications: if `~/.config/cchat/notify` exists and is executable, cchat runs it as `notify <session> <done|ask|test>` (with `CCHAT_NOTIFY_DEVICES`) whenever a tab you are not looking at turns green or orange. cchat does not ship a push server; the hook can send to anything (web push, ntfy, Telegram…). Ready-made: `cp examples/notify-ntfy ~/.config/cchat/notify` (edit `TOPIC` inside), then `cchat-set notify test`.
 
 ## Remote access (read this)
 
@@ -93,6 +97,10 @@ ttyd listens on 127.0.0.1 only and has **no authentication of its own**. To use 
 | `bin/cchat-unread` | Called by claude hooks (done, permission, started work) to color the tabs |
 | `bin/cchat-build-index` | Builds `index.html` from ttyd's default page plus the cchat parts (themes, phone key bar and scrolling, shortcuts, blinking) |
 | `bin/cchat-set` | View and change settings (`~/.config/cchat/settings`) |
+| `bin/cchat-send` · `bin/cchat-history` · `bin/cchat-snip` | Pass an answer between tabs · reopen closed conversations · saved prompts |
+| `bin/cchat-ttyd` | Starts ttyd (rebuilds the page after a ttyd upgrade; `KEEP_AWAKE=1` keeps the Mac awake) |
+| `bin/cchat-inbox` | (optional, `INBOX_REMOTE`) pulls files uploaded from the phone |
+| `examples/` | Notification hook examples (ntfy, macOS) |
 | `bin/cchat-label` | Set a session label by hand |
 | `bin/cchat-tunnel` | (optional) reverse SSH tunnel |
 | `bin/cchat-update` | (optional) daily claude CLI update |

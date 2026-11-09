@@ -15,3 +15,9 @@ TUNNEL_HOST=                          # ~/.ssh/config의 호스트 이름
 TUNNEL_REMOTE_PORT=9130               # 그 호스트에서 열 포트(127.0.0.1)
 
 AUTO_UPDATE=0                         # 1이면 매일 새벽 claude CLI 자동 업데이트 서비스 설치
+
+# 선택(보통 비워 둠)
+# CLAUDE_BIN=/path/to/claude          # 비우면 설치할 때 PATH에서 찾음
+# TMUX_SOCKET=cchat                   # tmux 서버 이름. 시험용으로 따로 띄울 때만 바꿈
+# BASE_PATH=/cchat                    # 주소 경로(http://127.0.0.1:PORT/cchat/)
+# KEEP_AWAKE=0                        # 1이면 ttyd가 떠 있는 동안 맥이 잠들지 않음(밖에서 쓸 때 권장)

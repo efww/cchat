@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""cchat: ttyd 기본 index.html에 cchat 전용 부분을 넣어 ~/.config/cchat/index.html을 만든다.
+"""cchat: ttyd 기본 index.html에 cchat 전용 부분을 넣어 @@HOME@@/.config/cchat/index.html을 만든다.
 
 - 모바일 viewport (폰에서 글자가 작게 축소되던 문제)
 - 기기별 터미널 색: PC=라이트, 폰(터치 또는 좁은 화면)=다크
@@ -18,9 +18,10 @@ import urllib.request
 from pathlib import Path
 
 TTYD = "@@BREW@@/ttyd"
-TEMP_PORT = 7699
 OUT = Path("@@HOME@@/.config/cchat/index.html")
-SETTINGS = Path("@@HOME@@/.config/cchat/settings")  # cchat-set이 쓰는 key=value
+STAMP = Path("@@HOME@@/.config/cchat/index.ttyd-version")
+SETTINGS = Path("@@HOME@@/.config/cchat/settings")
+SNIPS = Path("@@HOME@@/.config/cchat/snippets")  # cchat-snip  # cchat-set이 쓰는 key=value
 
 
 def setting(key: str, default: str) -> str:
@@ -81,8 +82,15 @@ def dark_extended_ansi() -> list:
 
 
 DARK["extendedAnsi"] = dark_extended_ansi()
-KEYS =[["Esc", "\u001b"], ["⇧Tab", "\u001b[Z"], ["Tab", "\t"], ["↑", "\u001b[A"],
-        ["↓", "\u001b[B"], ["←", "\u001b[D"], ["→", "\u001b[C"], ["^C", "\u0003"], ["⏎", "\r"]]
+# 폰 키 바. ★ = Alt+A(확인할 대화로), ⋯ = 아래 MORE 줄 열기/닫기. "@이름"은 페이지가 처리하는 동작.
+KEYS = [["★", "\u001ba"], ["Esc", "\u001b"], ["⇧Tab", "\u001b[Z"], ["Tab", "\t"], ["↑", "\u001b[A"],
+        ["↓", "\u001b[B"], ["^C", "\u0003"], ["⏎", "\r"], ["⋯", "@more"]]
+# ⋯ 줄: ☰ = Alt+O(전체 모아보기), 🎤 음성 입력, ✎ 자주 쓰는 지시문(cchat-snip), 📎 사진·파일(원격 중계가 있을 때만)
+MORE = [["☰", "\u001bo"], ["←", "\u001b[D"], ["→", "\u001b[C"], ["🎤", "@voice"], ["✎", "@snip"], ["📎", "@attach"]]
+
+# 홈 화면 앱(PWA): 원격 중계가 ./manifest.json을 내줄 때만 설치 가능(이 맥 주소로 바로 열면 404, 무해)
+MANIFEST = ('<link rel="manifest" href="./manifest.json">'
+            '<meta name="theme-color" content="#0d1117"><meta name="mobile-web-app-capable" content="yes">')
 
 VIEWPORT = ('<meta name="viewport" content="width=device-width, initial-scale=1, '
             'viewport-fit=cover, interactive-widget=resizes-content">')
@@ -95,14 +103,23 @@ html[data-cchat-device=mobile] #cchat-keys{display:flex;position:fixed;left:0;ri
   height:calc(48px + env(safe-area-inset-bottom));padding:5px 4px calc(5px + env(safe-area-inset-bottom));
   box-sizing:border-box;background:#161b22;border-top:1px solid #30363d;z-index:10;
   user-select:none;-webkit-user-select:none;touch-action:manipulation}
-#cchat-keys .k{flex:1;display:flex;align-items:center;justify-content:center;border-radius:6px;
+#cchat-more{display:none;position:fixed;left:0;right:0;bottom:calc(48px + env(safe-area-inset-bottom));gap:4px;padding:5px 4px;
+  box-sizing:border-box;background:#161b22;border-top:1px solid #30363d;z-index:11;height:44px}
+#cchat-more.on{display:flex}
+html.cchat-more-on[data-cchat-device=mobile] #terminal-container{height:calc(100% - 92px - env(safe-area-inset-bottom))}
+#cchat-keys .k.on{background:#30363d}
+#cchat-more .k.on{background:#1f6feb}
+#cchat-pop{position:fixed;left:8px;right:8px;bottom:calc(96px + env(safe-area-inset-bottom));z-index:13;max-height:45vh;overflow:auto;
+  background:#22272e;border:1px solid #444c56;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+#cchat-pop .pi{padding:12px 14px;color:#e6edf3;font:500 14px/1.35 system-ui,sans-serif;border-bottom:1px solid #30363d}
+#cchat-keys .k,#cchat-more .k{flex:1;display:flex;align-items:center;justify-content:center;border-radius:6px;
   background:#21262d;color:#e6edf3;border:1px solid #30363d;font:600 14px/1 -apple-system,system-ui,sans-serif}
-#cchat-keys .k:active{background:#388bfd;color:#fff}
+#cchat-keys .k:active,#cchat-more .k:active{background:#388bfd;color:#fff}
 </style>"""
 
 SCRIPT = """<script id="cchat-script">
 (() => {
-  const LIGHT = __LIGHT__, DARK = __DARK__, KEYS = __KEYS__, BUILD = '__BUILD__', SET = __SET__;
+  const LIGHT = __LIGHT__, DARK = __DARK__, KEYS = __KEYS__, MORE = __MORE__, BUILD = '__BUILD__', SET = __SET__;
   const mq = (q) => { try { return matchMedia(q).matches; } catch (_) { return false; } };
   const coarse = mq('(pointer: coarse)');
   const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '') || coarse
@@ -153,12 +170,12 @@ SCRIPT = """<script id="cchat-script">
     if (typeof args[0] === 'string') args[0] = withSession(args[0]);
     const ws = new NativeWS(...args);
     sock = ws;
-    ws.addEventListener('open', () => { openedAt = Date.now(); clearTimeout(fallback); });
+    ws.addEventListener('open', () => { openedAt = Date.now(); clearTimeout(fallback); clearTimeout(waitTimer); waitTimer = null; waitStep = 0; downBar(''); });
     ws.addEventListener('close', () => {
       if (sock !== ws) return;
-      tries = Date.now() - openedAt > 10000 ? 1 : tries + 1;  // 금방 또 끊기면 간격을 늘리고 5번에서 멈춤
+      tries = Date.now() - openedAt > 10000 ? 1 : tries + 1;  // 금방 또 끊기면 간격을 늘린다(최대 30초, 멈추지 않음)
       clearTimeout(autoTimer);
-      if (tries <= 5 && document.visibilityState === 'visible') autoTimer = setTimeout(() => reconnect('auto'), 1500 * tries);
+      if (document.visibilityState === 'visible') autoTimer = setTimeout(() => reconnect('auto'), Math.min(1500 * tries, 30000));
     });
     return ws;
   };
@@ -174,36 +191,138 @@ SCRIPT = """<script id="cchat-script">
       const em = window.term && window.term._core && window.term._core._onKey;
       if (em && em.fire) em.fire({ key: '\\r', domEvent: new KeyboardEvent('keydown', { key: 'Enter' }) });
     } catch (_) {}
-    fallback = setTimeout(() => { if (isDown()) location.reload(); }, 6000);
+    fallback = setTimeout(() => { if (isDown()) waitAndReload(); }, 6000);
   };
+  // 6초 안에 안 붙으면: 서버가 정말 cchat 페이지를 내줄 때만 새로고침한다.
+  // 맥이 잠들었거나 통로가 끊긴 동안 바로 새로고침하면 프록시 오류 페이지로 넘어가 재연결 코드가 사라졌다.
+  // 그 동안은 위에 작은 띠를 띄우고 2→30초 간격으로 다시 확인한다(띠를 누르면 바로 새로고침).
+  let waitTimer = null, waitStep = 0;
+  const WAIT = [2, 3, 5, 10, 20, 30];
+  const downBar = (text) => {
+    let el = document.getElementById('cchat-down');
+    if (!text) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'cchat-down';
+      el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:30;padding:6px 10px;text-align:center;cursor:pointer;'
+        + 'font:600 13px/1.3 system-ui,sans-serif;background:#9a6700;color:#fff';
+      el.onclick = () => location.reload();
+      document.body.appendChild(el);
+    }
+    el.textContent = text;
+  };
+  const serverUp = async () => {
+    try {
+      const r = await fetch(location.href, { cache: 'no-store', credentials: 'same-origin' });
+      return r.ok && (await r.text()).includes('cchat-script');
+    } catch (_) { return false; }
+  };
+  const waitAndReload = async () => {
+    clearTimeout(waitTimer);
+    if (!isDown()) { waitStep = 0; downBar(''); return; }
+    if (await serverUp()) { location.reload(); return; }
+    const s = WAIT[Math.min(waitStep++, WAIT.length - 1)];
+    downBar(`연결 끊김 — 맥이나 통로를 기다리는 중, ${s}초 뒤 다시 확인 (누르면 새로고침)`);
+    waitTimer = setTimeout(waitAndReload, s * 1000);
+  };
+  window.__cchatWait = () => ({ down: isDown(), step: waitStep, bar: !!document.getElementById('cchat-down') });
   const onBack = () => {
-    if (document.visibilityState === 'visible' && isDown() && tries <= 5) reconnect('visible');
+    if (document.visibilityState === 'visible' && isDown()) { if (waitTimer) waitAndReload(); else reconnect('visible'); }
   };
   document.addEventListener('visibilitychange', onBack);
   window.addEventListener('pageshow', onBack);
   window.addEventListener('online', onBack);
   window.addEventListener('focus', onBack);
 
+  const keyEl = (label, seq) => {
+    const key = document.createElement('div');
+    key.className = 'k';
+    key.textContent = label;
+    key.setAttribute('role', 'button');
+    key.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (seq[0] === '@') return action(seq.slice(1), key);
+      if (isDown()) { tries = 0; reconnect('button'); return; }  // 끊겨 있으면 어떤 버튼이든 재연결
+      if (window.term) window.term.input(seq, true);
+    });
+    key.addEventListener('mousedown', (e) => e.preventDefault());
+    key.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+    return key;
+  };
   const buildKeys = () => {
     const bar = document.createElement('div');
     bar.id = 'cchat-keys';
-    for (const [label, seq] of KEYS) {
-      const key = document.createElement('div');
-      key.className = 'k';
-      key.textContent = label;
-      key.setAttribute('role', 'button');
-      key.addEventListener('pointerdown', (e) => {
-        e.preventDefault();
-        if (isDown()) { tries = 0; reconnect('button'); return; }  // 끊겨 있으면 어떤 버튼이든 재연결
-        if (window.term) window.term.input(seq, true);
-      });
-      key.addEventListener('mousedown', (e) => e.preventDefault());
-      key.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
-      bar.appendChild(key);
+    for (const [label, seq] of KEYS) bar.appendChild(keyEl(label, seq));
+    const more = document.createElement('div');
+    more.id = 'cchat-more';
+    for (const [label, seq] of MORE) {
+      if (seq === '@voice' && !(window.SpeechRecognition || window.webkitSpeechRecognition)) continue;
+      const k = keyEl(label, seq);
+      if (seq === '@attach') { k.id = 'cchat-attach'; k.style.display = 'none'; }
+      more.appendChild(k);
     }
+    document.body.appendChild(more);
     document.body.appendChild(bar);
+    // 📎는 원격 중계가 업로드를 받을 때만 보인다
+    fetch('./upload', { cache: 'no-store' }).then((r) => { if (r.status === 204) document.getElementById('cchat-attach').style.display = ''; }).catch(() => {});
     if (window.term && typeof window.term.fit === 'function') window.term.fit();
   };
+  const popup = (items, onPick) => {  // 키 바 위에 뜨는 목록(지시문 등). 다시 누르거나 고르면 닫힘
+    let el = document.getElementById('cchat-pop');
+    if (el) { el.remove(); return; }
+    el = document.createElement('div');
+    el.id = 'cchat-pop';
+    for (const it of items) {
+      const b = document.createElement('div');
+      b.className = 'pi'; b.textContent = it;
+      b.addEventListener('pointerdown', (e) => { e.preventDefault(); el.remove(); onPick(it); });
+      el.appendChild(b);
+    }
+    document.body.appendChild(el);
+  };
+  let rec = null;
+  const action = (name, key) => {
+    const term = window.term;
+    if (name === 'more') {
+      const m = document.getElementById('cchat-more');
+      const on = !m.classList.contains('on');
+      m.classList.toggle('on', on); key.classList.toggle('on', on);
+      root.classList.toggle('cchat-more-on', on);  // 터미널을 한 줄 높이만큼 줄여 탭 줄이 가려지지 않게
+      setTimeout(() => { try { term && term.fit && term.fit(); } catch (_) {} }, 30);
+      const p = document.getElementById('cchat-pop'); if (p) p.remove();
+    } else if (name === 'snip') {
+      if (!SET.snips.length) { toast('지시문이 없습니다 — claude에게 "이 지시문 저장해 둬"'); return; }
+      popup(SET.snips, (t) => term && term.input(t, true));  // 보내지는 않음(확인하고 ⏎)
+    } else if (name === 'voice') {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (rec) { rec.stop(); return; }
+      rec = new SR();
+      rec.lang = navigator.language || 'ko-KR'; rec.interimResults = false; rec.maxAlternatives = 1;
+      key.classList.add('on'); toast('듣는 중… 말을 마치면 입력칸에 들어갑니다');
+      rec.onresult = (e) => { const t = e.results[0][0].transcript; if (t && term) term.input(t, true); };
+      rec.onerror = (e) => toast('음성 입력 실패: ' + e.error);
+      rec.onend = () => { rec = null; key.classList.remove('on'); };
+      rec.start();
+    } else if (name === 'attach') {
+      const inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = 'image/*,application/pdf,text/*,*/*';
+      inp.onchange = async () => {
+        const f = inp.files && inp.files[0];
+        if (!f) return;
+        if (f.size > 20 * 1024 * 1024) { toast('20MB까지 올릴 수 있습니다'); return; }
+        toast(`올리는 중… ${f.name}`);
+        try {
+          const r = await fetch('./upload', { method: 'POST', body: f, headers: { 'x-name': f.name.replace(/[^\\x20-\\x7e]/g, '_') } });
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          const { name } = await r.json();
+          if (term) term.input('\\u001bu', true);  // Alt+U: 맥이 중계에서 파일을 가져온다(cchat-inbox)
+          setTimeout(() => { if (term) term.input(`.cchat-inbox/${name} `, true); toast('맥으로 가져왔습니다 — 경로를 입력칸에 넣었어요'); }, 1500);
+        } catch (e) { toast('올리기 실패: ' + e.message); }
+      };
+      inp.click();
+    }
+  };
+  window.__cchatAction = action;
 
   // 폰: 손가락 위아래 드래그를 마우스 휠 신호(SGR)로 바꿔 보낸다.
   // xterm.js는 터치를 휠로 바꿔 주지 않아서 폰에서는 위 대화로 스크롤할 수 없었다.
@@ -297,6 +416,15 @@ SCRIPT = """<script id="cchat-script">
       }
       // 실제 폰에서 드래그가 잡혔는지 ttyd 로그에 남긴다(처음 5번만): touch/움직임수/보낸휠수
       if (moves && reports++ < 5) beacon(`touch-${moves}-${wheels}`);
+      // 가로로 빠르게 밀기(세로 스크롤이 안 일어난 경우만) = 이전/다음 대화. 왼쪽으로 밀면 다음(Alt+→), 오른쪽은 이전(Alt+←).
+      if (e.type === 'pointerup' && !wheels && window.term) {
+        const dx = e.clientX - downX, dy = e.clientY - downY;
+        if (Math.abs(dx) > 70 && Math.abs(dy) < 45 && Math.abs(dx) > 2 * Math.abs(dy)) {
+          swallowTouchEnd = true;
+          window.term.input(dx < 0 ? '\u001b[1;3C' : '\u001b[1;3D', true);
+          return;
+        }
+      }
       // 맨 아래 상태줄(대화 탭, STATUS_ROWS줄)을 톡 치면 마우스 클릭으로 보낸다 → 대화 번호를 눌러 그 대화로 전환.
       const term = window.term;
       if (e.type !== 'pointerup' || wheels || !term) return;
@@ -579,6 +707,106 @@ SCRIPT = """<script id="cchat-script">
   };
   setTimeout(pushSetup, 1500);
 
+  // 허락·질문 선택지 버튼: 화면 아래쪽에 "❯ 1. Yes / 2. … / 3. No" 같은 번호 목록이 보이면 그 번호만 버튼으로 띄운다.
+  // 폰에서 키보드를 올리지 않고 한 번에 고르게(PC는 클릭). 목록이 사라지면 버튼도 사라진다.
+  const CHOICE_RE = /^[\\s│|]*(?:❯\\s*)?([1-9])\\.\\s+(.{1,60}?)\\s*[│|]?\\s*$/;
+  let choiceKey = '';
+  const scanChoices = () => {
+    const term = window.term;
+    if (!term || !term.buffer || document.hidden) return;
+    const buf = term.buffer.active, rows = term.rows, found = [];
+    let cursor = false;  // claude 선택 목록에는 고른 줄 앞에 ❯가 있다(답 속 번호 목록과 구분)
+    for (let y = 0; y < rows - 2; y++) {
+      const line = buf.getLine(buf.viewportY + y);
+      const m = line && CHOICE_RE.exec(line.translateToString(true));
+      if (m) { found.push([m[1], m[2]]); if (/❯/.test(line.translateToString(true))) cursor = true; }
+    }
+    // 1부터 차례로 이어지는 2개 이상만 선택지로 본다
+    const opts = [];
+    for (const [n, t] of found) { if (Number(n) === opts.length + 1) opts.push([n, t]); else if (Number(n) === 1) { opts.length = 0; opts.push([n, t]); } }
+    const key = opts.length >= 2 && cursor ? opts.map((o) => o.join(':')).join('|') : '';
+    if (key === choiceKey) return;
+    choiceKey = key;
+    let bar = document.getElementById('cchat-choices');
+    if (!key) { if (bar) bar.remove(); return; }
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'cchat-choices';
+      bar.style.cssText = 'position:fixed;right:8px;z-index:12;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100vw - 16px);'
+        + 'bottom:' + (mobile ? 'calc(96px + env(safe-area-inset-bottom))' : '64px');  // 키 바·탭 두 줄 위
+      document.body.appendChild(bar);
+    }
+    bar.textContent = '';
+    for (const [n, t] of opts.slice(0, 5)) {
+      const b = document.createElement('button');
+      b.textContent = `${n} ${t.length > 18 ? t.slice(0, 17) + '…' : t}`;
+      b.title = t;
+      b.style.cssText = 'border:0;border-radius:16px;padding:8px 12px;font:600 13px system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3);'
+        + (/^no\\b|아니|거절/i.test(t) ? 'background:#cf222e;color:#fff' : n === '1' ? 'background:#1f883d;color:#fff' : 'background:#57606a;color:#fff');
+      b.addEventListener('pointerdown', (e) => { e.preventDefault(); if (window.term) window.term.input(n, true); });
+      b.addEventListener('mousedown', (e) => e.preventDefault());
+      bar.appendChild(b);
+    }
+  };
+  setInterval(scanChoices, 600);
+
+  // 알림을 눌렀을 때 이미 열린 창이면: 서비스 워커가 보낸 메시지로 페이지를 새로 불러오지 않고 그 대화로 바로 다시 붙는다.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (e) => {
+      const d = e.data || {};
+      if (d.type !== 'cchat-open' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/.test(d.session || '')) return;
+      if (d.session === curSession) return;
+      curSession = d.session;
+      try { history.replaceState(history.state, '', withSession(location.href)); } catch (_) {}
+      tries = 0;
+      // 번호 한 자리 대화(0=main, 1~9)는 Alt+숫자 키로 tmux가 바로 바꾼다. 그 밖의 이름은 그 대화로 다시 붙는다.
+      const digit = d.session === 'main' ? '0' : (/^[0-9]$/.test(d.session) ? d.session : null);
+      if (digit && window.term && sock && sock.readyState === 1) { window.term.input('\\u001b' + digit, true); return; }
+      if (sock && sock.readyState <= 1) { sock.close(); setTimeout(() => reconnect('notify'), 1600); }
+    });
+  }
+  window.__cchatChoices = () => choiceKey;
+
+  // 화면 켜짐 유지: 페이지가 보이는 동안, 작업 중인 탭이 있거나 1분 안에 화면 출력이 있으면 화면이 꺼지지 않게 한다.
+  let wakeLock = null, lastOut = Date.now();
+  const wakeTick = async () => {
+    const term = window.term;
+    if (term && !term.__cchatOut && term.onWriteParsed) { term.__cchatOut = true; term.onWriteParsed(() => { lastOut = Date.now(); }); }
+    const want = !document.hidden && (Date.now() - lastOut < 60000 || /\\d/.test(busyKey.split('@')[0]));
+    try {
+      if (want && !wakeLock && navigator.wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); }
+      else if (!want && wakeLock) { await wakeLock.release(); wakeLock = null; }
+    } catch (_) {}
+  };
+  setInterval(wakeTick, 5000);
+  window.__cchatWake = () => !!wakeLock;
+
+  // 첫 화면 안내: 이 브라우저에서 처음 열었을 때 한 번만(닫으면 다시 안 뜸). 한국어 브라우저면 한국어.
+  const firstHint = () => {
+    try { if (localStorage.getItem('cchat-hint-v1')) return; } catch (_) { return; }
+    const ko = /^ko/i.test(navigator.language || '');
+    const lines = ko
+      ? (mobile
+        ? ['아래 줄이 대화 탭 — 누르면 바뀜, + 는 새 대화', '깜빡임 = 작업 중 · 주황 = 확인 필요 · 녹색 = 끝남', '손가락으로 끌면 스크롤, 맨 아래 키 바로 Esc·Tab·방향키', '설정은 claude에게 말로 (예: "폰 글자 크게")']
+        : ['아래 줄이 대화 탭 — 클릭 또는 Alt+숫자, Alt+←/→', '+ 는 새 대화 (또는 주소에 ?arg=이름)', '깜빡임 = 작업 중 · 주황 = 확인 필요 · 녹색 = 끝남', '설정은 claude에게 말로 (예: "깜빡임 빠르게")'])
+      : (mobile
+        ? ['Bottom rows are session tabs — tap to switch, + opens a new one', 'Blinking = working · orange = needs you · green = done', 'Drag to scroll; the key bar has Esc, Tab and arrows', 'Change settings by asking claude (e.g. "bigger font on my phone")']
+        : ['Bottom rows are session tabs — click, or Alt+number, Alt+←/→', '+ opens a new session (or ?arg=name in the URL)', 'Blinking = working · orange = needs you · green = done', 'Change settings by asking claude (e.g. "faster blink")']);
+    const card = document.createElement('div');
+    card.id = 'cchat-hint';
+    card.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:25;max-width:min(440px,calc(100vw - 24px));'
+      + 'padding:12px 14px;border-radius:10px;font:500 13px/1.5 system-ui,sans-serif;box-shadow:0 4px 18px rgba(0,0,0,.25);'
+      + (dark ? 'background:#2d333b;color:#e6edf3' : 'background:#24292f;color:#fff');
+    card.innerHTML = '<b>cchat</b><ul style="margin:6px 0 8px;padding-left:18px">' + lines.map((l) => '<li>' + l + '</li>').join('') + '</ul>';
+    const ok = document.createElement('button');
+    ok.textContent = ko ? '알겠어요' : 'Got it';
+    ok.style.cssText = 'border:0;border-radius:6px;padding:6px 12px;font:600 13px system-ui,sans-serif;cursor:pointer;background:#4f967a;color:#fff';
+    ok.onclick = () => { card.remove(); try { localStorage.setItem('cchat-hint-v1', '1'); } catch (_) {} };
+    card.appendChild(ok);
+    document.body.appendChild(card);
+  };
+  setTimeout(firstHint, 1200);
+
   // ttyd가 터미널을 새로 만들거나 설정을 덮어써도 0.5초 안에 기기별 색으로 되돌린다.
   const apply = () => {
     const term = window.term;
@@ -603,7 +831,23 @@ SCRIPT = """<script id="cchat-script">
 </script>"""
 
 
+def free_port() -> int:
+    """임시 ttyd용 빈 포트(예전엔 7699 고정이라 다른 서버가 쓰면 엉뚱한 HTML을 받았다)."""
+    import socket
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def ttyd_version() -> str:
+    try:
+        return subprocess.run([TTYD, "--version"], capture_output=True, text=True, timeout=5).stdout.strip().split()[-1]
+    except (OSError, IndexError, subprocess.SubprocessError):
+        return "?"
+
+
 def fetch_base_index() -> str:
+    TEMP_PORT = free_port()
     proc = subprocess.Popen([TTYD, "-i", "lo0", "-p", str(TEMP_PORT), "true"],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
@@ -628,7 +872,11 @@ def settings() -> dict:
     except ValueError:
         blink = 1.5
     theme = lambda k, d: setting(k, d) if setting(k, d) in ("light", "dark") else d
-    return {"blinkMs": int(blink * 2000), "fontPc": font_px("font.pc"), "fontPhone": font_px("font.phone"),
+    try:
+        snips = [l.strip() for l in SNIPS.read_text(encoding="utf-8").splitlines() if l.strip()][:30]
+    except OSError:
+        snips = []
+    return {"blinkMs": int(blink * 2000), "fontPc": font_px("font.pc"), "fontPhone": font_px("font.phone"), "snips": snips,
             "themePc": theme("theme.pc", "light"), "themePhone": theme("theme.phone", "dark")}
 
 
@@ -640,11 +888,14 @@ def main() -> None:
     script = (SCRIPT.replace("__LIGHT__", json.dumps(LIGHT))
               .replace("__DARK__", json.dumps(DARK))
               .replace("__KEYS__", json.dumps(KEYS))
+              .replace("__MORE__", json.dumps(MORE))
               .replace("__BUILD__", time.strftime("%m%d%H%M"))
               .replace("__SET__", json.dumps(settings())))
     html = html.replace(charset, f"{charset}\n<!-- cchat: built by ~/.local/bin/cchat-build-index -->\n{VIEWPORT}", 1)
-    html = html.replace("</head>", f"{STYLE}\n{script}\n</head>", 1)
+    html = html.replace("</head>", f"{STYLE}\n{MANIFEST}\n{script}\n</head>", 1)
     OUT.write_text(html, encoding="utf-8")
+    # 이 페이지를 만든 ttyd 버전. cchat-ttyd(서비스 시작 래퍼)가 지금 ttyd와 다르면 다시 만든다.
+    STAMP.write_text(ttyd_version() + "\n", encoding="utf-8")
     print(f"wrote {OUT} ({len(html)} chars)")
 
 

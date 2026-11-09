@@ -1,0 +1,79 @@
+#!/usr/bin/python3 -I
+"""닫은 claude 대화를 찾아 다시 연다(작업 폴더 @@WORKDIR@@의 대화 기록).
+  cchat-history [검색어]           최근 대화 20개(검색어가 있으면 제목·첫 질문에서 찾음): 번호, 날짜, 제목
+  cchat-history open <id|번호> [세션]   그 대화를 이어서 새 탭(세션 이름, 없으면 빈 번호)으로 연다
+claude에게 "어제 하던 X 대화 다시 열어줘"라고 하면 이걸 쓴다."""
+import json, os, re, subprocess, sys, time
+WORK = "@@WORKDIR@@"
+# claude는 작업 폴더 경로의 영문·숫자 밖 글자를 -로 바꾼 이름으로 기록한다(/tmp는 /private/tmp로 잡히기도 함)
+PROJS = [os.path.expanduser("~/.claude/projects/" + re.sub(r"[^A-Za-z0-9]", "-", w)) for w in dict.fromkeys([WORK, os.path.realpath(WORK)])]
+TMUX = ["@@BREW@@/tmux", "-L", "@@TMUX_SOCKET@@"]
+
+
+def convs():
+    out = []
+    files = []
+    for d in PROJS:
+        try:
+            files += [os.path.join(d, f) for f in os.listdir(d) if f.endswith(".jsonl")]
+        except OSError:
+            pass
+    for p in sorted(files, key=os.path.getmtime, reverse=True)[:300]:
+        title = first = ""
+        try:
+            with open(p, encoding="utf-8", errors="ignore") as f:
+                for i, line in enumerate(f):
+                    if '"ai-title"' in line or '"custom-title"' in line:
+                        d = json.loads(line)
+                        title = d.get("customTitle") or d.get("aiTitle") or title
+                    elif not first and '"type":"user"' in line:
+                        c = json.loads(line).get("message", {}).get("content")
+                        if isinstance(c, list):
+                            c = " ".join(x.get("text", "") for x in c if isinstance(x, dict))
+                        if isinstance(c, str) and not c.startswith("<"):
+                            first = " ".join(c.split())[:80]
+                    if i > 4000 and title:
+                        break
+        except (OSError, ValueError):
+            continue
+        if title or first:
+            out.append((os.path.basename(p)[:-6], os.path.getmtime(p), title or first, first))
+    return out
+
+
+def main(a):
+    if a and a[0] == "open":
+        if len(a) < 2:
+            print(__doc__); return 2
+        key = a[1]
+        if key.isdigit() and len(key) < 4:
+            lst = convs()
+            if not 1 <= int(key) <= len(lst):
+                print("그 번호가 없습니다"); return 1
+            key = lst[int(key) - 1][0]
+        if not re.fullmatch(r"[0-9a-f-]{20,}", key):
+            print("대화 id 형식이 아닙니다"); return 1
+        names = subprocess.run(TMUX + ["list-sessions", "-F", "#{session_name}"], capture_output=True, text=True).stdout.split()
+        sess = a[2] if len(a) > 2 else next(str(n) for n in range(1, 999) if str(n) not in names)
+        if sess in names:
+            print(f"세션 {sess} 이 이미 있습니다"); return 1
+        subprocess.run(TMUX + ["new-session", "-d", "-s", sess, "-c", WORK, f"@@HOME@@/.local/bin/cchat-session --loop {key}"])
+        print(f"대화 {key[:8]}… 를 탭 {sess} 로 열었습니다(브라우저에서 그 탭을 누르세요).")
+        return 0
+    q = " ".join(a).lower()
+    lst = convs()
+    shown = 0
+    for i, (cid, mt, title, first) in enumerate(lst, 1):
+        if q and q not in (title + " " + first).lower():
+            continue
+        print(f"{i:>3}  {time.strftime('%m-%d %H:%M', time.localtime(mt))}  {title[:60]}  ({cid[:8]})")
+        shown += 1
+        if shown >= 20:
+            break
+    if not shown:
+        print("찾은 대화가 없습니다")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

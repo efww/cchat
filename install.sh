@@ -16,8 +16,33 @@ while (( $# )); do
 done
 [[ -n "$conf" && -f "$conf" ]] || { print -u2 "설정 파일을 -c로 주세요 (예: cp cchat.conf.example my.conf)"; exit 2; }
 source "$conf"
-KEYS=(HOME_DIR BREW WORKDIR PERMISSION_MODE PORT FONT_SIZE LAUNCHD_PREFIX PUBLIC_URL TUNNEL_HOST TUNNEL_REMOTE_PORT)
+# 선택 항목(없으면 기본값): TMUX_SOCKET = tmux 서버 이름(시험용 샌드박스를 따로 띄울 때 바꾼다),
+# CLAUDE_BIN = claude 실행 파일(없으면 지금 PATH에서 찾는다. nvm·npm으로 깐 경우도 그대로 잡힌다).
+: ${TMUX_SOCKET:=cchat}
+: ${INBOX_REMOTE:=}     # 폰 📎 업로드를 받아 둘 원격 "호스트:폴더"(원격 중계가 있을 때만, 비우면 끔)
+: ${KEEP_AWAKE:=0}     # 1이면 ttyd가 떠 있는 동안 맥이 잠들지 않게(caffeinate -is)
+: ${BASE_PATH:=/cchat}   # ttyd 주소 경로(시험용 샌드박스는 /cchat/t 처럼 따로)
+[[ -n "${CLAUDE_BIN:-}" ]] || CLAUDE_BIN=$(command -v claude 2>/dev/null || true)
+[[ -n "$CLAUDE_BIN" ]] || { [[ -x $HOME_DIR/.local/bin/claude ]] && CLAUDE_BIN=$HOME_DIR/.local/bin/claude; }
+KEYS=(HOME_DIR BREW WORKDIR PERMISSION_MODE PORT FONT_SIZE LAUNCHD_PREFIX PUBLIC_URL TUNNEL_HOST TUNNEL_REMOTE_PORT TMUX_SOCKET CLAUDE_BIN BASE_PATH KEEP_AWAKE INBOX_REMOTE)
 for k in $KEYS AUTO_UPDATE; do [[ -v $k ]] || { print -u2 "설정에 $k 가 없습니다"; exit 2; }; done
+
+# 설치 전 점검: 하나라도 틀리면 아무것도 바꾸지 않고 멈춘다(예전엔 서비스가 조용히 죽거나 claude가 끝없이 재시작됐다).
+problems=()
+for b in ttyd tmux; do [[ -x $BREW/$b ]] || problems+=("$BREW/$b 가 없습니다 — brew install ttyd tmux, BREW=\"\$(brew --prefix)/bin\" 확인"); done
+[[ -n "$CLAUDE_BIN" && -x "$CLAUDE_BIN" ]] || problems+=("claude 실행 파일을 찾지 못했습니다 — Claude Code를 설치하거나 설정에 CLAUDE_BIN=<경로>")
+[[ "$PERMISSION_MODE" == (default|acceptEdits|plan|bypassPermissions) ]] || problems+=("PERMISSION_MODE=$PERMISSION_MODE 는 쓸 수 없습니다(default|acceptEdits|plan|bypassPermissions)")
+[[ "$PORT" == <1024-65535> ]] || problems+=("PORT=$PORT 가 올바르지 않습니다")
+[[ -d "$WORKDIR" ]] || problems+=("WORKDIR=$WORKDIR 폴더가 없습니다")
+[[ "$BASE_PATH" =~ '^(/[A-Za-z0-9_-]+)+$' ]] || problems+=("BASE_PATH=$BASE_PATH 형식은 /cchat 처럼")
+[[ "$KEEP_AWAKE" == (0|1) ]] || problems+=("KEEP_AWAKE 는 0 또는 1")
+[[ "$TMUX_SOCKET" =~ '^[A-Za-z0-9_-]+$' ]] || problems+=("TMUX_SOCKET=$TMUX_SOCKET 은 영문·숫자·-·_ 만")
+if [[ -z "${out:-}" ]]; then
+  # 포트를 다른 프로그램이 쓰고 있으면 멈춘다(우리 ttyd면 괜찮음 — 재설치).
+  holder=$(lsof -nP -iTCP:$PORT -sTCP:LISTEN -Fc 2>/dev/null | sed -n 's/^c//p' | head -1)
+  [[ -z "$holder" || "$holder" == ttyd ]] || problems+=("포트 $PORT 를 $holder 가 쓰고 있습니다 — 설정의 PORT를 바꾸세요")
+fi
+(( $#problems )) && { print -u2 "설치 전 점검 실패:"; for p in $problems; do print -u2 "  - $p"; done; exit 2; }
 
 # 파일 하나를 렌더링: @@HOME@@ 은 HOME_DIR 값, 나머지는 같은 이름. 남은 @@...@@가 있으면 실패.
 render() {  # <원본> <결과>
@@ -70,6 +95,6 @@ for n in $SERVICES; do
   print "loaded $label"
 done
 # 이미 떠 있는 tmux 서버에 새 설정을 읽힌다(없으면 무시).
-$BREW/tmux -L cchat source-file $H/.config/cchat/tmux.conf 2>/dev/null || true
+$BREW/tmux -L $TMUX_SOCKET source-file $H/.config/cchat/tmux.conf 2>/dev/null || true
 
 print "done. 폰/PC 브라우저는 새로고침해야 새 화면이 적용된다."

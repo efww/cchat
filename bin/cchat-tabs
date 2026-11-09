@@ -4,26 +4,32 @@
   cchat-tabs render <client> <width> <지금대화> "<이름[+] 이름[+] ...>" <gen> [text|pad]
       맨 아래 줄 전체를 대화 탭으로 그린다. 이름 뒤 +done은 답이 끝났는데 안 본 대화(녹색), +ask는 허락을 기다리는 대화(주황), +busy는 작업 중(깜빡임). 값은 세션 옵션 @unread.
       다 들어가면 줄 폭을 나눠 쓰고, 넘치면 탭은 최소폭(이름+양옆 한 칸)으로 줄고 양 끝에 ◀ ▶.
-      ◀ ▶는 보이는 범위만 민다(대화는 안 바뀜). 범위는 클라이언트별로 ~/.cache/cchat-tabs/ 에 둔다.
+      ◀ ▶는 보이는 범위만 민다(대화는 안 바뀜). 범위는 클라이언트별로 @@HOME@@/.cache/cchat-tabs/ 에 둔다.
       <gen>은 화면 갱신용 숫자(범위를 밀 때 올려서 tmux가 다시 그리게 한다).
       상태줄이 2줄이라 탭 하나가 두 줄 높이다: text = 위 줄(번호·화살표, 왼쪽 정렬), pad = 아래 줄(대화 이름표).
-      이름표는 claude 상태줄 스크립트(~/.claude/statusline-command.sh)가 ~/.cache/cchat-tablabel/<세션>에 남긴 것,
+      이름표는 claude 상태줄 스크립트(~/.claude/statusline-command.sh)가 @@HOME@@/.cache/cchat-tablabel/<세션>에 남긴 것,
       없으면 claude가 붙인 대화 제목(pane_title).
       탭 폭보다 길면 앞에서부터 들어가는 만큼 넣고 탭 마지막 칸을 …로 끝낸다(한글은 두 칸으로 센다).
   cchat-tabs click <client> <_prev|_next>
       ◀ ▶ 클릭 처리(MouseDown1Status 바인딩).
-  cchat-tabs go <client> <prev|next|번호>
-      PC 단축키(Alt+←/→, Alt+숫자): 탭 순서로 이전/다음 대화(끝에서 돌아감), 또는 그 번호 대화(0=main).
+  cchat-tabs go <client> <prev|next|attention|번호>
+      PC 단축키(Alt+←/→, Alt+숫자, Alt+A): 탭 순서로 이전/다음 대화(끝에서 돌아감), 그 번호 대화(0=main),
+      attention = 확인할 대화(주황 먼저, 없으면 녹색). 폰 키 바의 ★도 Alt+A를 보낸다.
+  cchat-tabs click <client> _new
+      맨 끝 + 칸: 빈 번호로 새 대화를 만들어 옮긴다. 넘쳐서 ◀ ▶가 생기면 그 뒤에 숨은 확인할 대화 수를 화살표 색·숫자로 보여 준다.
 """
 import os
 import subprocess
 import sys
+import time
 import unicodedata
 
-TMUX = ["@@BREW@@/tmux", "-L", "cchat"]
-STATE = os.path.expanduser("~/.cache/cchat-tabs")
+TMUX = ["@@BREW@@/tmux", "-L", "@@TMUX_SOCKET@@"]
+STATE = os.path.expanduser("@@HOME@@/.cache/cchat-tabs")
 GAP = 1
 ARROW_W = 3  # " ◀ "
+PLUS_W = 3   # " + " 새 대화 칸(맨 끝)
+WORKDIR = "@@WORKDIR@@"
 
 CUR = "#[bg=black,fg=brightwhite,bold]"  # 지금 보는 탭: PC는 검정(폰 다크 테마에선 black이 밝은색으로 뒤집혀 흰 탭)
 DONE = "#[bg=green,fg=brightwhite,bold]"
@@ -137,7 +143,8 @@ def max_ofs(tabs, area):
 
 
 PAD_LINE = False
-LABEL_DIR = os.path.expanduser("~/.cache/cchat-tablabel")
+LABEL_DIR = os.path.expanduser("@@HOME@@/.cache/cchat-tablabel")
+MANUAL_LABEL_DIR = "@@HOME@@/.config/cchat/labels"
 
 
 def cells(ch):
@@ -168,13 +175,16 @@ def pane_title(name):
 
 
 def tab_label(name):
-    """이름표(claude 상태줄의 [번호] 옆 이름). 없으면 claude가 붙인 대화 제목."""
-    try:
-        with open(os.path.join(LABEL_DIR, name), encoding="utf-8") as f:
-            lab = " ".join(f.read().split())
-    except (OSError, ValueError):
-        lab = ""
-    return lab or pane_title(name)
+    """이름표: cchat-label로 직접 단 것(@@HOME@@/.config/cchat/labels) → claude 상태줄이 남긴 것 → claude가 붙인 대화 제목."""
+    for d in (MANUAL_LABEL_DIR, LABEL_DIR):
+        try:
+            with open(os.path.join(d, name), encoding="utf-8") as f:
+                lab = " ".join(f.read().split())
+        except (OSError, ValueError):
+            lab = ""
+        if lab:
+            return lab
+    return pane_title(name)
 
 
 def clip(text, room):
@@ -190,9 +200,36 @@ def clip(text, room):
     return out + " " * (room - 1 - used) + "…"
 
 
+_meta = None
+
+
+def meta(name):
+    """탭 아래 줄 끝 숫자: 작업 중이면 걸린 시간(3m), 아니면 대화 크기(42k). 한 번의 tmux 호출로 모든 대화 값을 읽는다."""
+    global _meta
+    if _meta is None:
+        _meta = {}
+        now = int(time.time())
+        for line in tmux("list-sessions", "-F", "#{session_name}\t#{@busy}\t#{@busy_since}\t#{@ctx}").splitlines():
+            n, busy, since, ctx = (line.split("\t") + ["", "", "", ""])[:4]
+            if busy and since.isdigit():
+                el = max(0, now - int(since))
+                _meta[n] = f"{el // 60}m" if el >= 60 else f"{el}s"
+            elif ctx:
+                _meta[n] = ctx
+    return _meta.get(name, "")
+
+
 def box(style, text, w, rng=None, busy=False):
     if PAD_LINE:
-        text = clip(tab_label(rng), w - 1) if rng and not rng.startswith("_") else ""
+        text = ""
+        if rng and not rng.startswith("_"):
+            m, lab = meta(rng), tab_label(rng)
+            if m and w - 1 >= len(m) + 4:  # 이름표 칸을 줄이고 끝에 숫자
+                room = w - 1 - len(m) - 1
+                text = clip(lab, room) if width_of(lab) > room else lab + " " * (room - width_of(lab))
+                text += " " + m
+            else:
+                text = clip(lab, w - 1)
     pad = max(0, w - width_of(text))
     left = pad // 2 if not rng or rng.startswith("_") else min(1, pad)  # 탭 이름은 왼쪽 정렬(한 칸 띄움), 화살표는 가운데
     sp = (lambda n: f"#[fg=colour{BUSY_MARK}]{' ' * n}{style}") if busy else (lambda n: " " * n)
@@ -214,13 +251,36 @@ def style_of(name, unread, cur):
     return ASK if unread == "ask" else DONE
 
 
+def plus_box():
+    return box(ARROW_ON, "+", PLUS_W, "_new")
+
+
+def hidden_style(hidden, cur):
+    """◀ ▶ 뒤에 숨은 탭 중 확인할 것(주황 먼저, 없으면 녹색)과 그 개수."""
+    ask = sum(1 for n, u in hidden if u == "ask" and n != cur)
+    done = sum(1 for n, u in hidden if u == "done" and n != cur)
+    if ask:
+        return ASK, ask + done
+    if done:
+        return DONE, done
+    return None, 0
+
+
+def arrow(ch, hidden, cur, rng):
+    st, cnt = hidden_style(hidden, cur)
+    if st:
+        return box(st, f"{ch}{cnt if cnt < 10 else '+'}", ARROW_W, rng)
+    return box(ARROW_ON if hidden else ARROW_OFF, ch, ARROW_W, rng)
+
+
 def render(client, width, cur, tabs):
     if not tabs:
         return ""
+    width -= PLUS_W + GAP  # 맨 끝 + 칸 자리
     widths = fit_all(tabs, width)
     if widths is not None:
         parts = [box(style_of(n, u, cur), label(n), w, n, is_busy(n, u, cur)) for (n, u), w in zip(tabs, widths)]
-        return (" " * GAP).join(parts) + PLAIN
+        return (" " * GAP).join(parts) + " " * GAP + plus_box() + PLAIN
 
     area = width - 2 * (ARROW_W + GAP)
     top = max_ofs(tabs, area)
@@ -237,18 +297,30 @@ def render(client, width, cur, tabs):
     shown = tabs[ofs:ofs + cnt]
     ws = [minw(n) for n, _ in shown]  # 고정폭 그대로(남는 칸은 ▶ 앞 빈칸)
     rest = max(0, area - sum(ws) - GAP * (len(ws) - 1))
-    left = box(ARROW_ON if ofs > 0 else ARROW_OFF, "◀", ARROW_W, "_prev")
-    right = box(ARROW_ON if ofs + cnt < len(tabs) else ARROW_OFF, "▶", ARROW_W, "_next")
+    left = arrow("◀", tabs[:ofs], cur, "_prev")
+    right = arrow("▶", tabs[ofs + cnt:], cur, "_next")
     mid = (" " * GAP).join(box(style_of(n, u, cur), label(n), w, n, is_busy(n, u, cur)) for (n, u), w in zip(shown, ws))
-    return f"{left}{' ' * GAP}{mid}{' ' * (GAP + rest)}{right}"
+    return f"{left}{' ' * GAP}{mid}{' ' * (GAP + rest)}{right}{' ' * GAP}{plus_box()}"
 
 
 def tmux(*args):
     return subprocess.run(TMUX + list(args), capture_output=True, text=True).stdout.strip()
 
 
+def new(client):
+    """+ 칸: 비어 있는 가장 작은 번호(1부터)로 새 대화를 만들고 그리로 옮긴다."""
+    used = {label(n) for n, _ in parse(tmux("list-sessions", "-F", "#{session_name}"))}
+    n = 1
+    while str(n) in used:
+        n += 1
+    tmux("new-session", "-d", "-s", str(n), "-c", WORKDIR, "@@HOME@@/.local/bin/cchat-session --loop")
+    tmux("switch-client", "-c", client, "-t", f"={n}:")
+
+
 def click(client, which):
-    width = int(tmux("display", "-p", "-c", client, "#{client_width}") or 80)
+    if which == "_new":
+        return new(client)
+    width = int(tmux("display", "-p", "-c", client, "#{client_width}") or 80) - PLUS_W - GAP
     cur = tmux("display", "-p", "-c", client, "#{client_session}")
     tabs = parse(tmux("list-sessions", "-F", "#{session_name}"))
     if fit_all(tabs, width) is not None:
@@ -275,7 +347,17 @@ def go(client, which):
     names = [n for n, _ in parse(tmux("list-sessions", "-F", "#{session_name}"))]
     if not names:
         return
-    if which in ("prev", "next"):
+    if which == "attention":
+        # ★ / Alt+A: 주황(확인 필요) 대화부터, 없으면 녹색(끝남). 지금 대화 다음부터 탭 순서로 돈다.
+        tabs = parse(tmux("list-sessions", "-F", "#{session_name}#{?#{@unread},+#{@unread},}"))
+        i = names.index(cur) if cur in names else -1
+        ring = tabs[i + 1:] + tabs[:i + 1]
+        target = next((n for n, u in ring if u == "ask" and n != cur), None) \
+            or next((n for n, u in ring if u == "done" and n != cur), None)
+        if target is None:
+            tmux("display-message", "-c", client, "확인할 대화가 없습니다")
+            return
+    elif which in ("prev", "next"):
         i = names.index(cur) if cur in names else 0
         target = names[(i + (1 if which == "next" else -1)) % len(names)]
     else:
