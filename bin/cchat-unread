@@ -95,6 +95,11 @@ def rieul_ji(t):  # "할지·지울지·넣을지"처럼 ㄹ받침 + "지"(고�
 def asks(t):
     if POLITE.search(t): return False
     return bool(END.search(t) or DECIDE.search(t) or (rieul_ji(t) and ASKWORD.search(t)))
+# 선택지에 "권장:"·"추천:"·"(권장)"이 붙어 있으면 고르라는 뜻이라 주황(목록은 길 수 있어 마지막 8줄을 본다).
+tail = [l.strip() for l in text.strip().splitlines() if l.strip()][-8:]
+rec = next((l for l in reversed(tail) if re.search(r"(권장|추천) ?:|[(（](권장|추천)[)）]|\(recommended\)", l, re.I)), None)
+if rec:
+    print(rec.strip(" *_`>-")[:120]); sys.exit()
 for l in reversed(last):
     for sent in reversed(re.split(r"(?<=[.?!])\s+", l)):
         if asks(sent):
