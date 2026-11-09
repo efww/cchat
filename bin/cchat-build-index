@@ -591,6 +591,10 @@ SCRIPT = """<script id="cchat-script">
       // Ctrl+V: 터미널로 ^V를 보내면 claude가 ttyd를 돌리는 맥의 클립보드를 읽어 붙인다. 키는 막고(전파 중단)
       // 브라우저 기본 붙여넣기만 일어나게 해서 PC 클립보드가 들어가게 한다(preventDefault는 하지 않는다).
       if (e.ctrlKey && !e.altKey && !e.metaKey && e.code === 'KeyV') { e.stopImmediatePropagation(); return; }
+      // Shift+Enter: xterm은 그냥 Enter(\\r)를 보내 입력이 전송돼 버린다. claude 입력칸 줄바꿈인 ESC+Enter로 바꿔 보낸다(폰 키바 ⇧⏎와 같음).
+      if (e.key === 'Enter' && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey && !e.isComposing && window.term) {
+        e.preventDefault(); e.stopImmediatePropagation(); window.term.input('\u001b\\r', true); return;
+      }
       if (!e.altKey || e.ctrlKey || e.metaKey || !window.term) return;
       let seq = null;
       const m = /^Digit([0-9])$/.exec(e.code);
