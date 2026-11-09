@@ -23,9 +23,10 @@ case "$1" in
     while true; do
       @@CLAUDE_BIN@@ --permission-mode "$PERMISSION_MODE" --settings @@HOME@@/.config/cchat/claude-settings.json \
         --append-system-prompt "$CCHAT_HINT" "${resume[@]}"
+      rc=$?  # 바로 받아 둔다(아래 resume=() 대입이 $?를 0으로 덮어 비정상 종료에도 탭이 닫혔다)
       resume=()
       # /exit 처럼 정상 종료(0)면 바로 이 대화를 닫는다. 비정상 종료일 때만 아래에서 물어본다.
-      (( $? == 0 )) && exit 0
+      (( rc == 0 )) && exit 0
       # claude가 켜 둔 마우스·포커스·붙여넣기 보고 모드를 끈다. 안 끄면 탭 클릭·브라우저 포커스 신호가
       # 입력에 섞여(예: ESC[I ESC[<0;50;19M q) q가 q로 안 읽혀 다시 시작돼 버렸다(2026-11-05).
       printf '\e[?1000l\e[?1002l\e[?1003l\e[?1006l\e[?1015l\e[?1004l\e[?2004l'
