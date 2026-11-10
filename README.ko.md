@@ -76,7 +76,7 @@ cchat 탭 아무 데서나 claude에게 "깜빡임 좀 빠르게", "폰 글자 �
 | 명령 | 하는 일 |
 |---|---|
 | `cchat-set` | 지금 설정 보기 |
-| `cchat-set blink 1.5` | 작업 중 탭 깜빡임 박자(초) |
+| `cchat-set blink 0.8` | 작업 중 탭 깜빡임 박자(초) |
 | `cchat-set tab ctx off` | 탭의 대화 크기(42k) 표시 끄기 |
 | `cchat-set font phone 16` / `font pc off` | 기기별 글자 크기(`off` = `FONT_SIZE`) |
 | `cchat-set theme pc dark` | 기기별 라이트/다크(기본 PC 라이트, 폰 다크) |

@@ -609,7 +609,7 @@ SCRIPT = """<script id="cchat-script">
   }
 
   // 작업 중 탭 깜빡임: cchat-tabs가 작업 중 탭의 빈칸 글자색을 BUSY_MARK(256색 123번)로 칠해 둔다(빈칸이라 안 보임).
-  // 1초마다 맨 아래 2줄(상태줄)만 읽어 그 탭의 칸 범위를 찾고, 그 위에 반투명 판을 얹어 cchat-set blink 박자(기본 1.5초)마다 판을 담은 층 전체의 진하기를 딱 바꾼다(모든 탭 같은 박자).
+  // 1초마다 맨 아래 2줄(상태줄)만 읽어 그 탭의 칸 범위를 찾고, 그 위에 반투명 판을 얹어 cchat-set blink 박자(기본 0.8초)마다 판을 담은 층 전체의 진하기를 딱 바꾼다(모든 탭 같은 박자).
   // 터미널 색·글자 그림은 건드리지 않고(다시 그리기 없음), 판은 입력을 통과시킨다(pointer-events:none).
   const BUSY_MARK = 123, BUSY_CYCLE = SET.blinkMs;
   let busyKey = '';
@@ -872,9 +872,9 @@ def fetch_base_index() -> str:
 def settings() -> dict:
     """cchat-set 값 중 페이지가 쓰는 것: 깜빡임 한 주기(ms, 평소+짙게), 기기별 글자 크기(0=ttyd 기본), 기기별 테마."""
     try:
-        blink = min(5.0, max(0.5, float(setting("blink", "1.5"))))
+        blink = min(5.0, max(0.5, float(setting("blink", "0.8"))))
     except ValueError:
-        blink = 1.5
+        blink = 0.8
     theme = lambda k, d: setting(k, d) if setting(k, d) in ("light", "dark") else d
     try:
         snips = [l.strip() for l in SNIPS.read_text(encoding="utf-8").splitlines() if l.strip()][:30]

@@ -76,7 +76,7 @@ Tell claude in any cchat tab, e.g. "make the blink faster" or "bigger font on my
 | Command | Effect |
 |---|---|
 | `cchat-set` | Show current settings |
-| `cchat-set blink 1.5` | Blink period of working tabs, in seconds |
+| `cchat-set blink 0.8` | Blink period of working tabs, in seconds |
 | `cchat-set tab ctx off` | Hide the conversation size (42k) on tabs |
 | `cchat-set font phone 16` / `font pc off` | Font size per device (`off` = `FONT_SIZE`) |
 | `cchat-set theme pc dark` | Light/dark per device (default: PC light, phone dark) |

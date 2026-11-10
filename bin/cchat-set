@@ -7,14 +7,14 @@
 #   cchat-set notify done|ask on|off   종류별: done=답 끝남, ask=확인 기다림
 #   cchat-set notify test              지금 설정대로 테스트 알림 보내기
 #   cchat-set quiet 01-08|off          방해 금지 시간(시 단위, 이 시간엔 알림 안 보냄)
-#   cchat-set blink <초>               작업 중 탭 깜빡임 박자(0.5~5, 기본 1.5) — 브라우저 새로고침 필요
+#   cchat-set blink <초>               작업 중 탭 깜빡임 박자(0.5~5, 기본 0.8) — 브라우저 새로고침 필요
 #   cchat-set font pc|phone <px>|off   글자 크기(8~32, off=기본 @@FONT_SIZE@@) — 브라우저 새로고침 필요
 #   cchat-set theme pc|phone light|dark 색 테마(기본 PC=light, 폰=dark) — 브라우저 새로고침 필요
 #   cchat-set tab ctx on|off           탭에 대화 크기(42k) 표시(작업 중 걸린 시간은 그대로)
 # 내부용: cchat-set --devices-for <done|ask|test>  지금 알림을 보낼 기기 목록(없으면 빈 줄)
 F=@@HOME@@/.config/cchat/settings
 N=@@HOME@@/.config/cchat/notify
-typeset -A D=(notify on notify.pc on notify.phone on notify.done on notify.ask on quiet off blink 1.5 font.pc off font.phone off theme.pc light theme.phone dark tab.ctx on)
+typeset -A D=(notify on notify.pc on notify.phone on notify.done on notify.ask on quiet off blink 0.8 font.pc off font.phone off theme.pc light theme.phone dark tab.ctx on)
 ORDER=(notify notify.pc notify.phone notify.done notify.ask quiet blink font.pc font.phone theme.pc theme.phone tab.ctx)
 
 get() { local v; v=$(grep -m1 "^$1=" $F 2>/dev/null | cut -d= -f2-); print -r -- "${v:-${D[$1]}}"; }
