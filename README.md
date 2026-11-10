@@ -103,6 +103,7 @@ ttyd listens on 127.0.0.1 only and has **no authentication of its own**. To use 
 | `bin/cchat-inbox` | (optional, `INBOX_REMOTE`) pulls files uploaded from the phone |
 | `examples/` | Notification hook examples (ntfy, macOS) |
 | `bin/cchat-label` | Set a session label by hand |
+| `bin/cchat-restart` | Restart claude in every tab (e.g. after an update), resuming each conversation; busy tabs are skipped unless `--all` |
 | `bin/cchat-tunnel` | (optional) reverse SSH tunnel |
 | `bin/cchat-update` | (optional) daily claude CLI update |
 | `config/` | tmux config, claude settings (theme, hooks) |

@@ -1,0 +1,29 @@
+#!/bin/zsh
+# cchat 탭의 claude를 다시 시작한다(claude 업데이트·설정 반영용). 대화는 그대로 이어서 연다(--resume).
+#   cchat-restart            작업 중이 아닌 모든 탭
+#   cchat-restart 1 3        그 탭만
+#   cchat-restart --all      작업 중인 탭까지(하던 작업은 끊긴다)
+# 이 명령을 실행한 탭(claude 안에서 부른 경우)은 맨 마지막에, 몇 초 뒤 다시 시작한다(답을 마칠 시간).
+T=(@@BREW@@/tmux -L @@TMUX_SOCKET@@)
+SESS=@@HOME@@/.claude/sessions
+force=""; [[ "$1" == --all ]] && { force=1; shift; }
+targets=("$@"); (( $#targets )) || targets=(${(f)"$($T list-sessions -F '#{session_name}')"})
+self=""; [[ "$TMUX" == */@@TMUX_SOCKET@@,* && -n "$TMUX_PANE" ]] && self=$($T display -p -t "$TMUX_PANE" '#{session_name}')
+later=""
+for s in $targets; do
+  pp=$($T display -p -t "=$s:" '#{pane_pid}' 2>/dev/null) || { print "$s: 없는 탭"; continue; }
+  cp=$(ps -ax -o pid=,ppid=,comm= | awk -v p=$pp '$2==p && $3 ~ /claude$/ {print $1; exit}')
+  [[ -n "$cp" ]] || { print "$s: claude가 안 떠 있음, 건너뜀"; continue; }
+  id=$(/usr/bin/python3 -I -c 'import json,sys
+try: print(json.load(open(sys.argv[1])).get("sessionId") or "")
+except Exception: pass' $SESS/$cp.json)
+  if [[ -z "$force" && -n "$($T show -t "=$s:" -qv @busy)" && "$s" != "$self" ]]; then print "$s: 작업 중이라 건너뜀(--all 이면 끊고 다시 시작)"; continue; fi
+  cmd="@@HOME@@/.local/bin/cchat-session --loop $id"
+  if [[ "$s" == "$self" ]]; then later="$cmd"; continue; fi
+  $T respawn-pane -k -t "=$s:" "$cmd" && print "$s: 다시 시작(${id:-새 대화})"
+done
+if [[ -n "$later" ]]; then
+  print "$self: 이 탭은 8초 뒤 다시 시작"
+  ( sleep 8; $T respawn-pane -k -t "=$self:" "$later" ) </dev/null >/dev/null 2>&1 &!
+fi
+exit 0

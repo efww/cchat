@@ -103,6 +103,7 @@ ttyd는 127.0.0.1에만 열리고 **자체 인증이 없다**. 밖에서 쓰려�
 | `bin/cchat-inbox` | (선택, `INBOX_REMOTE`) 폰에서 올린 파일 가져오기 |
 | `examples/` | 알림 훅 예시(ntfy, macOS) |
 | `bin/cchat-label` | 대화 이름표 직접 달기 |
+| `bin/cchat-restart` | claude 다시 시작(업데이트 반영), 대화는 이어서. 작업 중인 탭은 건너뜀(`--all`이면 포함) |
 | `bin/cchat-tunnel` | (선택) SSH 역방향 통로 |
 | `bin/cchat-update` | (선택) 매일 claude CLI 업데이트 |
 | `config/` | tmux 설정, claude 설정(테마·훅) |
