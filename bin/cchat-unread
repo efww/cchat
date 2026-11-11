@@ -55,6 +55,7 @@ case "$kind" in
   busy)
     [[ -n "$($T show -t "=$s:" -qv @busy_since)" ]] || $T set -t "=$s:" @busy_since "$(date +%s)"
     $T set -t "=$s:" @busy 1; refresh
+    # claude 상태 파일이 busy(에이전트 결과를 기다리는 동안 화면이 멈춰 있어도)나 백그라운드면 계속 작업 중으로 본다(11-11, 1번 탭이 30초마다 꺼지던 것).
     # Esc로 중단하면 Stop 훅이 안 와서 작업 중 표시가 남는다(idle_prompt 알림도 안 옴, 2026-11-06 확인).
     # 그래서 작업 중인 동안 15초마다 화면을 보고, claude의 진행 표시줄("… (12s ·" 같은 것)도 없고 화면도 그대로인 게
     # 두 번 연속이면 끈다. 화면 변화도 보는 건 claude 업데이트로 진행 표시 문구가 바뀌어도 작업 중을 놓치지 않게 하려는 것.
@@ -65,7 +66,7 @@ case "$kind" in
         while sleep ${CCHAT_BUSY_POLL:-15}; do
           [[ -n "$($T show -t "=$s:" -qv @busy 2>/dev/null)" ]] || break
           scr=$($T capture-pane -p -t "$TMUX_PANE" 2>/dev/null | sed '$d' | sed '$d')  # 맨 아래 2줄(상태줄: 시계 등)은 빼고 비교
-          if print -r -- "$scr" | grep -qE '… \(([0-9]+h )?([0-9]+m )?[0-9]+s|esc to interrupt' || [[ -n "$last" && "$scr" != "$last" ]] || [[ "$(cstatus)" == ${~BG} ]]; then miss=0
+          if print -r -- "$scr" | grep -qE '… \(([0-9]+h )?([0-9]+m )?[0-9]+s|esc to interrupt' || [[ -n "$last" && "$scr" != "$last" ]] || [[ "$(cstatus)" == (busy|${~BG}) ]]; then miss=0
           else (( ++miss >= 2 )) && { $T set -u -t "=$s:" @busy; $T set -u -t "=$s:" @busy_since; refresh; print -r -- "$(date '+%m-%d %T') busy-off s=$s (진행 표시·화면 변화 없음)" >>@@HOME@@/Library/Logs/cchat-unread.log; break; }; fi
           last=$scr
         done
