@@ -41,8 +41,8 @@ OTHER = "#[bg=white,fg=black]"
 # 브라우저(cchat-build-index의 installBusyBlink)가 맨 아래 2줄에서 이 색의 빈칸을 찾아 그 탭 위에 깜빡이는 판을 얹는다.
 BUSY_MARK = 123
 # 오래 안 쓴 탭(마지막 작업 뒤 1시간·6시간 넘음)은 글자를 흐리게. 테마 색(brightblack)과 흐림(dim)이라 라이트·다크 둘 다 맞는다.
-IDLE_1H = "#[bg=white,fg=brightblack]"
-IDLE_6H = "#[bg=white,fg=brightblack,dim]"
+IDLE_1H = "#[bg=white,fg=brightblack,dim]"
+IDLE_6H = "#[bg=brightwhite,fg=brightblack,dim]"  # 탭 바탕도 화면 바탕 쪽으로 물러나게
 ARROW_ON = "#[bg=white,fg=black,bold]"
 ARROW_OFF = "#[bg=white,fg=brightblack]"
 PLAIN = "#[default]"
