@@ -80,7 +80,7 @@ cchat 탭 아무 데서나 claude에게 "깜빡임 좀 빠르게", "폰 글자 �
 | `cchat-set tab ctx off` | 탭의 대화 크기(42k) 표시 끄기 |
 | `cchat-set font phone 16` / `font pc off` | 기기별 글자 크기(`off` = `FONT_SIZE`) |
 | `cchat-set theme pc dark` | 기기별 라이트/다크(기본 PC 라이트, 폰 다크) |
-| `cchat-set notify on\|off`, `notify pc\|phone\|done\|ask on\|off`, `quiet 01-08` | 알림(알림 훅 필요, 아래) |
+| `cchat-set notify on\|off`, `notify pc\|phone\|telegram\|done\|ask on\|off`, `quiet 01-08` | 알림(알림 훅 필요, 아래) |
 
 깜빡임·글자 크기·테마는 브라우저 새로고침 뒤 적용됩니다. 알림: `~/.config/cchat/notify`가 실행 파일로 있으면, 보고 있지 않은 탭이 녹색·주황이 될 때 `notify <세션> <done|ask|test>`로 부릅니다(`CCHAT_NOTIFY_DEVICES` 함께). 푸시 서버는 들어 있지 않고, 훅에서 웹 푸시·ntfy·텔레그램 등 원하는 곳으로 보내면 됩니다. 바로 쓰기: `cp examples/notify-ntfy ~/.config/cchat/notify`(안의 `TOPIC` 수정) 후 `cchat-set notify test`.
 

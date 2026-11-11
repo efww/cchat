@@ -4,6 +4,7 @@
 #   cchat-set                          지금 설정 보기
 #   cchat-set notify on|off            알림 전체
 #   cchat-set notify pc|phone on|off   기기별(브라우저에서 '알림 켜기'로 등록한 기기)
+#   cchat-set notify telegram on|off   알림 훅이 텔레그램도 보내게(훅이 지원할 때, 기본 off)
 #   cchat-set notify done|ask on|off   종류별: done=답 끝남, ask=확인 기다림
 #   cchat-set notify test              지금 설정대로 테스트 알림 보내기
 #   cchat-set quiet 01-08|off          방해 금지 시간(시 단위, 이 시간엔 알림 안 보냄)
@@ -14,8 +15,8 @@
 # 내부용: cchat-set --devices-for <done|ask|test>  지금 알림을 보낼 기기 목록(없으면 빈 줄)
 F=@@HOME@@/.config/cchat/settings
 N=@@HOME@@/.config/cchat/notify
-typeset -A D=(notify on notify.pc on notify.phone on notify.done on notify.ask on quiet off blink 0.8 font.pc off font.phone off theme.pc light theme.phone dark tab.ctx on)
-ORDER=(notify notify.pc notify.phone notify.done notify.ask quiet blink font.pc font.phone theme.pc theme.phone tab.ctx)
+typeset -A D=(notify on notify.pc on notify.phone on notify.telegram off notify.done on notify.ask on quiet off blink 0.8 font.pc off font.phone off theme.pc light theme.phone dark tab.ctx on)
+ORDER=(notify notify.pc notify.phone notify.telegram notify.done notify.ask quiet blink font.pc font.phone theme.pc theme.phone tab.ctx)
 
 get() { local v; v=$(grep -m1 "^$1=" $F 2>/dev/null | cut -d= -f2-); print -r -- "${v:-${D[$1]}}"; }
 put() {
@@ -37,7 +38,7 @@ devices_for() {  # <done|ask|test>
   [[ $(get notify) == on ]] || return 0
   [[ $1 == test ]] || { [[ $(get notify.$1) == on ]] && ! quiet_now; } || return 0
   local out=()
-  for d in pc phone; do [[ $(get notify.$d) == on ]] && out+=$d; done
+  for d in pc phone telegram; do [[ $(get notify.$d) == on ]] && out+=$d; done
   print -r -- "$out"
 }
 
@@ -50,14 +51,14 @@ case "${1:-}" in
   notify)
     case "${2:-}" in
       on|off) put notify $2 ;;
-      pc|phone|done|ask) onoff "$3"; put notify.$2 $3 ;;
+      pc|phone|telegram|done|ask) onoff "$3"; put notify.$2 $3 ;;
       test)
         [[ -x $N ]] || { print -u2 "알림 훅이 없습니다: $N"; exit 1; }
         devs=$(devices_for test)
         [[ -n "$devs" ]] || { print "꺼져 있어 보내지 않았습니다(cchat-set 으로 확인)"; exit 0; }
         CCHAT_NOTIFY_DEVICES="$devs" $N test test
         tail -1 @@HOME@@/Library/Logs/cchat-unread.log ;;
-      *) print -u2 "cchat-set notify on|off | pc|phone|done|ask on|off | test"; exit 2 ;;
+      *) print -u2 "cchat-set notify on|off | pc|phone|telegram|done|ask on|off | test"; exit 2 ;;
     esac ;;
   quiet)
     if [[ "${2:-}" == off ]]; then put quiet off
@@ -77,6 +78,6 @@ case "${1:-}" in
     [[ "${2:-}" == ctx ]] || { print -u2 "cchat-set tab ctx on|off"; exit 2; }
     onoff "${3:-}"; put tab.ctx $3
     @@BREW@@/tmux -L @@TMUX_SOCKET@@ refresh-client -S 2>/dev/null; true ;;
-  -h|--help|help) sed -n '2,15p' $0 | sed 's/^# \{0,1\}//' ;;
+  -h|--help|help) sed -n '2,16p' $0 | sed 's/^# \{0,1\}//' ;;
   *) print -u2 "모르는 설정: $1 (cchat-set help)"; exit 2 ;;
 esac
