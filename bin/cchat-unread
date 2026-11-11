@@ -12,6 +12,8 @@ kind=${1:-done}
 [[ "$TMUX" == */@@TMUX_SOCKET@@,* && -n "$TMUX_PANE" ]] || exit 0
 T=(@@BREW@@/tmux -L @@TMUX_SOCKET@@)
 s=$($T display -p -t "$TMUX_PANE" '#{session_name}') || exit 0
+# 마지막으로 일한 시각(탭을 오래 안 쓴 정도에 따라 흐리게 그리는 데 씀, cchat-tabs)
+[[ "$kind" == idle ]] || $T set -t "=$s:" @last_act "$(date +%s)"
 refresh() { $T list-clients -F '#{client_name}' | while read -r c; do $T refresh-client -t "$c" -S; done; }
 if [[ "$kind" == resume ]]; then
   # PostToolUse 훅(도구 하나 끝날 때마다): 허락하거나 질문에 답한 뒤 claude가 계속 일하는데 작업 중 표시가 꺼져 있던 것을 다시 켠다.

@@ -18,6 +18,8 @@
   cchat-tabs click <client> _new
       맨 끝 + 칸: 빈 번호로 새 대화를 만들어 옮긴다. 넘쳐서 ◀ ▶가 생기면 그 뒤에 숨은 확인할 대화 수를 화살표 색·숫자로 보여 준다.
 """
+import glob
+import json
 import os
 import subprocess
 import sys
@@ -38,6 +40,9 @@ OTHER = "#[bg=white,fg=black]"
 # 작업 중 탭: 겉모습은 OTHER와 같고, 빈칸의 글자색만 표시용 색 번호(BUSY_MARK)로 칠한다(빈칸이라 안 보임).
 # 브라우저(cchat-build-index의 installBusyBlink)가 맨 아래 2줄에서 이 색의 빈칸을 찾아 그 탭 위에 깜빡이는 판을 얹는다.
 BUSY_MARK = 123
+# 오래 안 쓴 탭(마지막 작업 뒤 1시간·6시간 넘음)은 글자를 흐리게. 테마 색(brightblack)과 흐림(dim)이라 라이트·다크 둘 다 맞는다.
+IDLE_1H = "#[bg=white,fg=brightblack]"
+IDLE_6H = "#[bg=white,fg=brightblack,dim]"
 ARROW_ON = "#[bg=white,fg=black,bold]"
 ARROW_OFF = "#[bg=white,fg=brightblack]"
 PLAIN = "#[default]"
@@ -256,11 +261,42 @@ def is_busy(name, mark, cur):
     return mark == "busy" and name != cur
 
 
+_idle = None
+
+
+def idle_secs(name):
+    """마지막 작업 뒤 지난 초: claude 상태 파일(~/.claude/sessions/<pid>.json)의 상태가 마지막으로 바뀐 시각과
+    cchat-unread가 남긴 @last_act 중 늦은 것. 둘 다 없으면 0(흐리게 안 함). tmux의 활동 시각은 화면 갱신으로 늘 최근이라 안 쓴다."""
+    global _idle
+    if _idle is None:
+        last = {}
+        for f in glob.glob(os.path.expanduser("@@HOME@@/.claude/sessions/*.json")):
+            try:
+                d = json.load(open(f))
+                os.kill(int(d["pid"]), 0)
+                n = str(d.get("tmux") or "").split(":")[0]
+                t = int(d.get("statusUpdatedAt") or 0) // 1000
+                if n and t:
+                    last[n] = max(last.get(n, 0), t)
+            except Exception:
+                pass
+        for line in tmux("list-sessions", "-F", "#{session_name}\t#{@last_act}").splitlines():
+            n, la = (line.split("\t") + ["", ""])[:2]
+            if la.isdigit():
+                last[n] = max(last.get(n, 0), int(la))
+        now = int(time.time())
+        _idle = {n: now - t for n, t in last.items()}
+    return _idle.get(name, 0)
+
+
 def style_of(name, unread, cur):
     if name == cur:
         return CUR
-    if not unread or unread == "busy":
+    if unread == "busy":
         return OTHER
+    if not unread:
+        age = idle_secs(name)
+        return IDLE_6H if age >= 6 * 3600 else IDLE_1H if age >= 3600 else OTHER
     return ASK if unread == "ask" else DONE
 
 
