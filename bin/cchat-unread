@@ -82,21 +82,21 @@ case "$kind" in
 esac
 # 답은 끝났는데 백그라운드 셸·에이전트가 남아 있으면 녹색 대신 계속 깜빡이고, 다 끝나서 claude가 쉬면(idle) 그때 녹색.
 # 그 사이 claude가 다시 일하면(busy, 백그라운드 결과를 받아 이어서 하는 경우) 이 대기는 빠지고 그 턴의 Stop이 처리한다.
-if [[ $kind == done && -z "${CCHAT_BG_DONE:-}" ]]; then
-  st=""; for i in 1 2 3 4 5 6; do st=$(cstatus); [[ "$st" == busy ]] || break; sleep 0.5; done
-  if [[ "$st" == ${~BG} ]]; then
+# 상태는 이 훅이 끝나야 claude가 바꾼다(훅 안에서 기다리면 계속 busy로 보인다, 11-11 확인). 그래서 기다림은 따로 떼어 돌린다.
+if [[ $kind == done && -z "${CCHAT_BG_DONE:-}" && -n "$(cstatus)" ]]; then
+  (
+    st=""; for i in {1..20}; do sleep 0.5; st=$(cstatus); [[ "$st" == busy ]] || break; done
+    if [[ "$st" != ${~BG} ]]; then print -r -- "$input" | CCHAT_BG_DONE=1 @@HOME@@/.local/bin/cchat-unread done; exit 0; fi
     $T set -t "=$s:" @busy 1; $T set -u -t "=$s:" @unread; refresh
     print -r -- "$(date '+%m-%d %T') done-bg s=$s ($st, 백그라운드 끝나면 녹색)" >>@@HOME@@/Library/Logs/cchat-unread.log
-    (
-      while sleep 5; do
-        st=$(cstatus)
-        [[ "$st" == ${~BG} ]] && continue
-        [[ "$st" == idle ]] && print -r -- "$input" | CCHAT_BG_DONE=1 @@HOME@@/.local/bin/cchat-unread done
-        break
-      done
-    ) </dev/null >/dev/null 2>&1 &!
-    exit 0
-  fi
+    while sleep 5; do
+      st=$(cstatus)
+      [[ "$st" == ${~BG} ]] && continue
+      [[ "$st" == idle ]] && print -r -- "$input" | CCHAT_BG_DONE=1 @@HOME@@/.local/bin/cchat-unread done
+      break
+    done
+  ) </dev/null >/dev/null 2>&1 &!
+  exit 0
 fi
 # 답이 글로 묻고 끝났으면("진행할까요?", "정해 주세요") 녹색이 아니라 주황(내 차례)으로 본다.
 # 질문 도구를 안 쓰고 글로 묻는 턴이 많아(11-09 대화 171턴 중 63턴) 주황이 거의 안 나오던 것.
