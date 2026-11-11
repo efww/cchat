@@ -36,6 +36,21 @@ try:
 except Exception:
     pass'
 }
+# claude가 남기는 상태(@@HOME@@/.claude/sessions/<pid>.json의 status: idle·busy·shell·agents 등) 중 이 칸 것.
+# shell/agent/agents/background = 답 한 턴은 끝났지만 백그라운드 셸·에이전트가 아직 도는 중.
+cstatus() {
+  /usr/bin/python3 -I -c '
+import glob, json, os, sys
+for f in glob.glob(os.path.expanduser("@@HOME@@/.claude/sessions/*.json")):
+    try:
+        d = json.load(open(f))
+        if not str(d.get("tmux") or "").endswith("." + sys.argv[1]): continue
+        os.kill(int(d["pid"]), 0)
+        print(d.get("status") or ""); break
+    except Exception:
+        pass' "$TMUX_PANE" 2>/dev/null
+}
+BG='(shell|agent|agents|background)'
 case "$kind" in
   busy)
     [[ -n "$($T show -t "=$s:" -qv @busy_since)" ]] || $T set -t "=$s:" @busy_since "$(date +%s)"
@@ -50,7 +65,7 @@ case "$kind" in
         while sleep ${CCHAT_BUSY_POLL:-15}; do
           [[ -n "$($T show -t "=$s:" -qv @busy 2>/dev/null)" ]] || break
           scr=$($T capture-pane -p -t "$TMUX_PANE" 2>/dev/null | sed '$d' | sed '$d')  # 맨 아래 2줄(상태줄: 시계 등)은 빼고 비교
-          if print -r -- "$scr" | grep -qE '… \(([0-9]+h )?([0-9]+m )?[0-9]+s|esc to interrupt' || [[ -n "$last" && "$scr" != "$last" ]]; then miss=0
+          if print -r -- "$scr" | grep -qE '… \(([0-9]+h )?([0-9]+m )?[0-9]+s|esc to interrupt' || [[ -n "$last" && "$scr" != "$last" ]] || [[ "$(cstatus)" == ${~BG} ]]; then miss=0
           else (( ++miss >= 2 )) && { $T set -u -t "=$s:" @busy; $T set -u -t "=$s:" @busy_since; refresh; print -r -- "$(date '+%m-%d %T') busy-off s=$s (진행 표시·화면 변화 없음)" >>@@HOME@@/Library/Logs/cchat-unread.log; break; }; fi
           last=$scr
         done
@@ -59,8 +74,27 @@ case "$kind" in
       print $! > $pidf
     fi
     exit 0 ;;
-  idle) [[ -n "$($T show -t "=$s:" -qv @busy)" ]] && { $T set -u -t "=$s:" @busy; $T set -u -t "=$s:" @busy_since; refresh; }; exit 0 ;;
+  idle) [[ "$(cstatus)" == ${~BG} ]] && exit 0  # 백그라운드 작업 중이면 작업 중 표시 유지
+    [[ -n "$($T show -t "=$s:" -qv @busy)" ]] && { $T set -u -t "=$s:" @busy; $T set -u -t "=$s:" @busy_since; refresh; }; exit 0 ;;
 esac
+# 답은 끝났는데 백그라운드 셸·에이전트가 남아 있으면 녹색 대신 계속 깜빡이고, 다 끝나서 claude가 쉬면(idle) 그때 녹색.
+# 그 사이 claude가 다시 일하면(busy, 백그라운드 결과를 받아 이어서 하는 경우) 이 대기는 빠지고 그 턴의 Stop이 처리한다.
+if [[ $kind == done && -z "${CCHAT_BG_DONE:-}" ]]; then
+  st=""; for i in 1 2 3 4 5 6; do st=$(cstatus); [[ "$st" == busy ]] || break; sleep 0.5; done
+  if [[ "$st" == ${~BG} ]]; then
+    $T set -t "=$s:" @busy 1; $T set -u -t "=$s:" @unread; refresh
+    print -r -- "$(date '+%m-%d %T') done-bg s=$s ($st, 백그라운드 끝나면 녹색)" >>@@HOME@@/Library/Logs/cchat-unread.log
+    (
+      while sleep 5; do
+        st=$(cstatus)
+        [[ "$st" == ${~BG} ]] && continue
+        [[ "$st" == idle ]] && print -r -- "$input" | CCHAT_BG_DONE=1 @@HOME@@/.local/bin/cchat-unread done
+        break
+      done
+    ) </dev/null >/dev/null 2>&1 &!
+    exit 0
+  fi
+fi
 # 답이 글로 묻고 끝났으면("진행할까요?", "정해 주세요") 녹색이 아니라 주황(내 차례)으로 본다.
 # 질문 도구를 안 쓰고 글로 묻는 턴이 많아(11-09 대화 171턴 중 63턴) 주황이 거의 안 나오던 것.
 qdet=""

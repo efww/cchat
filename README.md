@@ -50,7 +50,7 @@ Update: `git pull && ./install.sh -c my.conf`. Uninstall and details: [INSTALL.m
   - Black = the session you are viewing
   - Green = finished replying, not seen yet
   - Orange = waiting for your permission or answer
-  - Blinking gray = working (all working tabs blink in sync)
+  - Blinking gray = working (all working tabs blink in sync). Stays blinking while background shells or agents run after the reply, then turns green
   - The label row ends with the time a working tab has been busy (`3m`) or the conversation size (`42k` tokens)
   - **+** at the end opens a new session; when tabs overflow, ◀ ▶ show how many hidden tabs need you (`▶2`)
 - **Desktop shortcuts**: Alt(Option)+number = go to that session, Alt+←/→ = previous/next, Alt+A = next tab that needs you, Alt+O = overview of all sessions. Shift+Enter = new line (does not send). Ctrl+V pastes your local (browser) clipboard.
