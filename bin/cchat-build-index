@@ -376,6 +376,65 @@ SCRIPT = """<script id="cchat-script">
       const t = ta();
       if (document.activeElement === t || vh() < downH - 80) { selHits.push(why); if (t) t.blur(); }
     };
+    // 화면 줄(1부터)의 글자와 칸 번호 대응. 한글처럼 두 칸짜리 글자가 있어도 칸 위치를 맞춘다.
+    const rowText = (row) => {
+      const term = window.term, buf = term.buffer.active;
+      const line = buf.getLine(buf.viewportY + row - 1);
+      let s = '', cols = [];
+      if (!line) return { s, cols };
+      for (let x = 0; x < term.cols; x++) {
+        const cell = line.getCell(x);
+        if (!cell || cell.getWidth() === 0) continue;
+        const ch = cell.getChars() || ' ';
+        s += ch; for (let k = 0; k < ch.length; k++) cols.push(x + 1);
+      }
+      return { s, cols };
+    };
+    // 그 칸에 걸친 http(s) 주소. 줄 끝까지 꽉 찬 주소는 다음 줄(claude가 접어 쓴 나머지)과 이어 붙인다.
+    // claude는 긴 주소를 화면 오른쪽 끝에서 자르고 다음 줄(들여쓰기 뒤)에 이어 쓴다.
+    const UC = /[^\s<>"'`│]/.source, URL_RE = new RegExp('https?://' + UC + '+', 'g');
+    const EDGE = 3;  // 오른쪽 끝에서 이 칸 안에서 끝나면 "줄 끝에 닿음"
+    const atEdge = (cols, i) => cols[i] >= window.term.cols - EDGE;
+    // 다음 줄이 이어진 부분이면 {from, to(문자 위치), full(그 줄도 끝까지 참)}
+    const contOf = (row) => {
+      if (row > window.term.rows) return null;
+      const t = rowText(row), m = t.s.match(new RegExp('^( {0,8})(' + UC + '+)( *)$')) || t.s.match(new RegExp('^( {0,8})(' + UC + '+)'));
+      if (!m) return null;
+      const from = m[1].length, to = from + m[2].length - 1;
+      return { text: m[2], a: t.cols[from], b: t.cols[to], full: m[0].length === t.s.length && atEdge(t.cols, to) };
+    };
+    const urlAt = (row, col) => {
+      const term = window.term;
+      if (!term || !term.buffer) return null;
+      // 이 줄이 앞 줄 주소의 이어진 부분이면 앞 줄부터 본다(여러 줄 이어질 수 있음).
+      let start = row;
+      while (start > 1 && row - start < 10) {
+        const pv = rowText(start - 1), prev = pv.s.replace(/\s+$/, '');
+        if (!prev || !atEdge(pv.cols, prev.length - 1) || !new RegExp(UC + '$').test(prev)) break;
+        if (!contOf(start)) break;
+        start--;
+      }
+      for (let r = start; r <= row; r++) {
+        const { s, cols } = rowText(r);
+        for (const m of s.matchAll(URL_RE)) {
+          const last = m.index + m[0].length - 1;
+          let url = m[0], hit = r === row && col >= cols[m.index] && col <= cols[last];
+          // 줄 끝에 닿았으면 다음 줄들의 앞부분을 이어 붙인다.
+          if (s.slice(last + 1).trim() === '' && atEdge(cols, last)) {
+            for (let rr = r + 1; rr <= term.rows && rr - r <= 10; rr++) {
+              const c = contOf(rr);
+              if (!c) break;
+              url += c.text;
+              if (rr === row && col >= c.a && col <= c.b) hit = true;
+              if (!c.full) break;
+            }
+          }
+          if (hit) return url.replace(/[.,;:!?)\]}'"]+$/, '');
+        }
+      }
+      return null;
+    };
+    window.__cchatUrlAt = urlAt;
     const mouse = (b, c, up) => window.term && window.term.input(`\u001b[<${b};${c.col};${c.row}${up ? 'm' : 'M'}`, true);
     const cancelLong = () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } };
     el.addEventListener('contextmenu', (e) => e.preventDefault(), { capture: true });
@@ -431,6 +490,17 @@ SCRIPT = """<script id="cchat-script">
       if (Math.abs(e.clientX - downX) > 12 || Math.abs(e.clientY - downY) > 12) return;
       const c = cellAt(downX, downY);
       if (!c) return;
+      // 주소(URL)를 톡 치면 새 창으로 연다. PC는 마우스를 올려야 링크가 잡히는데 폰에는 그게 없어서 눌러도 안 열렸다.
+      if (!c.last && !inInputBox(c.row)) {
+        const url = urlAt(c.row, c.col);
+        if (url) {
+          swallowTouchEnd = true;
+          if (!downKbUp && ta()) ta().blur();
+          window.open(url, '_blank', 'noopener');
+          toast('열기: ' + (url.length > 60 ? url.slice(0, 57) + '…' : url));
+          return;
+        }
+      }
       // 대화 화면 탭(키보드 내려간 상태, 입력칸 밖): 키보드 없이 클릭만 보낸다(Jump to bottom 등).
       if (!c.last) {
         if (downKbUp || inInputBox(c.row)) return;  // 키보드가 이미 올라와 있거나 입력칸이면 원래대로
