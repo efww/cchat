@@ -146,6 +146,13 @@ for l in reversed(last):
 ' 2>/dev/null)
   [[ -n "$qdet" ]] && kind=ask
 fi
+# 자동 진행(cchat-set auto <탭> on): 고른 탭이면 답이 끝났을 때 cchat-auto가 사용자 지시를 기준으로 다음 입력을 정해 보낸다.
+# 멈추기로 하면 cchat-auto가 CCHAT_AUTO_SKIP=1로 이 훅을 다시 불러 평소처럼 탭 색·알림으로 넘긴다. 허락 창·질문 도구(ask 훅)는 여기 오지 않는다.
+if [[ $1 == done && -z "${CCHAT_AUTO_SKIP:-}" && " $(@@HOME@@/.local/bin/cchat-set --auto-list) " == *" $s "* ]]; then
+  $T set -u -t "=$s:" @busy; $T set -u -t "=$s:" @busy_since; refresh
+  print -r -- "$input" | @@HOME@@/.local/bin/cchat-auto "$s" "$kind" >/dev/null 2>&1 &!
+  exit 0
+fi
 $T set -u -t "=$s:" @busy
 [[ $kind == done || -n "$qdet" ]] && $T set -u -t "=$s:" @busy_since
 c=$(ctx_from_transcript); [[ -n "$c" ]] && $T set -t "=$s:" @ctx "$c"
@@ -190,6 +197,7 @@ else:
     out = next((l[2:].strip() for l in reversed(raw) if l.startswith("● ")), "")
 print(out[:120])' "$kind")
       [[ -n "$qdet" ]] && det=$qdet  # 글로 물은 질문이면 그 문장을 알림에 그대로
+      [[ -n "${CCHAT_AUTO_WHY:-}" ]] && det="자동 멈춤: $CCHAT_AUTO_WHY"
       act=""
       [[ $kind == ask && "$scr" == *"Do you want"* ]] && act=1
       CCHAT_NOTIFY_DEVICES="$devs" CCHAT_NOTIFY_DETAIL="$det" CCHAT_NOTIFY_ACTIONS="$act" CCHAT_NOTIFY_PANE="$TMUX_PANE" $N "$s" "$kind"

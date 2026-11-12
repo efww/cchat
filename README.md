@@ -103,6 +103,7 @@ Tell claude in any cchat tab, e.g. "dark theme on my PC" or "bigger font on my p
 | `cchat-set tab rows 2` | Tab rows, 1–5. 1 (default) = each tab is two lines tall (number/name); 2 = two-line tabs (number/name) in 2 rows, 3–5 = one-line tabs spread over that many rows (for many tabs); changing rows resets the height to that default |
 | `cchat-set tab height 1.5` | Tab height in multi-row mode (tab rows 2–5). 1 (default) = one text line, 1.5 = one and a half (padding drawn with block characters), 2 = number on top and name below like the default mode. The status bar holds at most 5 lines, so rows × height is capped |
 | `cchat-set tab busy play` | Working mark on busy tabs: `spinner` (default; one step per 5 s in terminals) or a still green ▶, in browser and terminal alike |
+| `cchat-set auto 5 on` | Auto-continue for tab 5: when an answer ends, `cchat-auto` (a tool-less `claude -p`) sends the next step, judged only from what *you* asked in that tab. It stops and notifies when the work is done, the next step is unclear or a choice is yours, or it would push, deploy, delete, pay, send data out or need a secret; at most 8 auto inputs per instruction and 60 a day. Sent inputs start with `[auto]`. Log: `~/Library/Logs/cchat-auto.log` |
 | `cchat-set font phone 16` / `font pc off` | Font size per device (`off` = `FONT_SIZE`) |
 | `cchat-set theme pc dark` | Light/dark per device (default: PC light, phone dark) |
 | `cchat-set notify on\|off`, `notify pc\|phone\|telegram\|done\|ask on\|off`, `quiet 01-08` | Notifications (needs a notify hook, see below) |
@@ -130,6 +131,7 @@ ttyd listens on 127.0.0.1 only and has **no authentication of its own**. To use 
 | `bin/cchat-ls` | Claude session list (Alt+L, ☰): per tab time since last work, goal, current step, close; summaries prepared with claude haiku |
 | `bin/cchat-termux` | (copy to Termux) ssh/mosh connect + 🎤 voice input, `--shell` wraps the whole shell |
 | `bin/cchat-stt` | Speech to text (whisper.cpp), called over ssh by cchat-termux |
+| `bin/cchat-auto` | Auto-continue (`cchat-set auto`): picks and sends the next input from your own instructions when an answer ends; called by cchat-unread |
 | `docs/diagrams.py` | Generates the architecture pictures in this README (`docs/arch-*.svg`) |
 | `bin/cchat-label` | Set a session label by hand |
 | `bin/cchat-restart` | Restart claude in every tab (e.g. after an update), resuming each conversation; busy tabs are skipped unless `--all` |

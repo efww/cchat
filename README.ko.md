@@ -103,6 +103,7 @@ cchat 탭 아무 데서나 claude에게 "PC는 다크 테마로", "폰 글자 �
 | `cchat-set tab rows 2` | 탭 줄 수 1~5. 1(기본)은 탭이 2줄 높이(번호/이름), 2는 두 줄 탭(번호/이름)을 2줄, 3~5는 한 줄짜리 탭을 그 줄 수에 배치(탭이 많을 때). 줄 수를 바꾸면 높이도 그 기본값으로 |
 | `cchat-set tab height 1.5` | 여러 줄 모드(tab rows 2~5)의 탭 높이. 1(기본)은 글자 한 줄, 1.5는 한 줄 반(블록 문자로 칠함), 2는 기본 모드처럼 윗줄 번호·아랫줄 이름표. 상태줄은 최대 5줄이라 줄 수×높이가 넘치면 낮춘다 |
 | `cchat-set tab busy play` | 작업 중 탭 표시: `spinner`(기본, 터미널은 5초마다 한 칸) 또는 움직이지 않는 녹색 ▶. 브라우저·터미널 모두 |
+| `cchat-set auto 5 on` | 5번 탭 자동 진행: 답이 끝나면 `cchat-auto`(도구 없는 `claude -p`)가 **내가 그 탭에 한 지시만** 기준으로 다음 단계를 대신 보낸다. 일이 끝났거나, 다음 단계가 애매하거나, 내가 골라야 하거나, push·배포·삭제·결제·외부 전송·비밀번호가 필요하면 멈추고 알림. 지시 하나에 자동 입력 8번, 하루 60번까지. 보낸 입력은 `[auto]`로 시작. 기록 `~/Library/Logs/cchat-auto.log` |
 | `cchat-set font phone 16` / `font pc off` | 기기별 글자 크기(`off` = `FONT_SIZE`) |
 | `cchat-set theme pc dark` | 기기별 라이트/다크(기본 PC 라이트, 폰 다크) |
 | `cchat-set notify on\|off`, `notify pc\|phone\|telegram\|done\|ask on\|off`, `quiet 01-08` | 알림(알림 훅 필요, 아래) |
@@ -130,6 +131,7 @@ ttyd는 127.0.0.1에만 열리고 **자체 인증이 없다**. 밖에서 쓰려�
 | `bin/cchat-ls` | Claude 세션 목록(Alt+L·☰): 탭마다 지난 시간·큰 흐름·지금 일·끄기, 요약은 claude haiku로 미리 |
 | `bin/cchat-termux` | (폰 Termux에 복사) ssh/mosh 접속 + 🎤 음성 입력, `--shell`이면 셸 전체 |
 | `bin/cchat-stt` | 음성 → 글(whisper.cpp), cchat-termux가 ssh로 부름 |
+| `bin/cchat-auto` | 자동 진행(`cchat-set auto`): 답이 끝나면 내 지시 기준으로 다음 입력을 정해 보냄, cchat-unread가 부름 |
 | `docs/diagrams.py` | 이 README의 구조 그림(`docs/arch-*.svg`) 만들기 |
 | `bin/cchat-label` | 대화 이름표 직접 달기 |
 | `bin/cchat-restart` | claude 다시 시작(업데이트 반영), 대화는 이어서. 작업 중인 탭은 건너뜀(`--all`이면 포함) |
