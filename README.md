@@ -51,7 +51,7 @@ Update: `git pull && ./install.sh -c my.conf`. Uninstall and details: [INSTALL.m
   - Green = finished replying, not seen yet
   - Orange = waiting for your permission or answer
   - Faded text = idle for over 1 hour (fainter after 6 hours)
-  - Blinking blue = working (all working tabs blink in sync). Stays blinking while background shells or agents run after the reply, then turns green
+  - Blinking pale yellow = working (all working tabs blink in sync). Stays blinking while background shells or agents run after the reply, then turns green
   - The label row ends with the time a working tab has been busy (`3m`) or the conversation size (`42k` tokens)
   - **+** at the end opens a new session; when tabs overflow, ◀ ▶ show how many hidden tabs need you (`▶2`)
 - **Desktop shortcuts**: Alt(Option)+number = go to that session, Alt+←/→ = previous/next, Alt+A = next tab that needs you, Alt+O = overview of all sessions. Shift+Enter = new line (does not send). Ctrl+V pastes your local (browser) clipboard.
@@ -63,7 +63,7 @@ Update: `git pull && ./install.sh -c my.conf`. Uninstall and details: [INSTALL.m
 ## How to use
 
 1. **Open a session**: go to `http://127.0.0.1:7681/cchat/?arg=1`. Each `?arg=name` is its own claude session; a new name creates a new tab.
-2. **Start a task and move on**: type your prompt, press Enter, then switch to another tab with **Alt+number** (or click it). The tab you left blinks blue while claude works.
+2. **Start a task and move on**: type your prompt, press Enter, then switch to another tab with **Alt+number** (or click it). The tab you left blinks pale yellow while claude works.
 3. **Watch the colors**: when that tab turns **green**, the answer is ready; **orange** means claude is waiting for your approval or an answer.
 4. **Go back**: click the tab, or use **Alt+←/→**. Opening a tab clears its color. Approve in the orange tab and claude continues.
 5. **Close the browser any time**: sessions keep running in tmux. Open the page again and everything is where you left it. Type `/exit` in a session to close its tab.
