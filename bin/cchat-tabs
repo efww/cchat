@@ -256,13 +256,55 @@ def box(style, text, w, rng=None, busy=False):
                 text += " " + m
             else:
                 text = clip(lab, w - 1)
+    if busy and not PAD_LINE and SPIN and w - width_of(text) >= 3:
+        text = f"{text} {SPIN}"  # 페이지가 아닌 터미널(Termux·ssh 등): 스피너를 글자로 직접 그린다
     pad = max(0, w - width_of(text))
     left = pad // 2 if not rng or rng.startswith("_") else min(1, pad)  # 탭 이름은 왼쪽 정렬(한 칸 띄움), 화살표는 가운데
-    sp = (lambda n: f"#[fg=colour{BUSY_MARK}]{' ' * n}{style}") if busy and not PAD_LINE else (lambda n: " " * n)
+    sp = (lambda n: f"#[fg=colour{BUSY_MARK}]{' ' * n}{style}") if busy and not PAD_LINE and not SPIN else (lambda n: " " * n)
     body = f"{style}{sp(left)}{text}{sp(pad - left)}"
     if rng:
         return f"#[range=user|{rng}]{body}#[norange]{PLAIN}"
     return body + PLAIN
+
+
+SPIN = ""  # 페이지가 아닌 클라이언트일 때 이번 스피너 글자(main에서 정함)
+SPIN_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
+
+def is_page(client):
+    """이 tmux 클라이언트가 브라우저 페이지(ttyd)인가. 페이지는 스피너를 JS로 그리므로 글자를 넣지 않는다.
+    프로세스 조상에 ttyd가 있으면 페이지. 결과는 클라이언트 이름+pid별로 캐시한다."""
+    pid = ""
+    for line in tmux("list-clients", "-F", "#{client_name}\t#{client_pid}").splitlines():
+        n, p = (line.split("\t") + [""])[:2]
+        if n == client:
+            pid = p
+    if not pid.isdigit():
+        return True
+    f = os.path.join(STATE, "page-" + client.strip("/").replace("/", "_"))
+    try:
+        cp, v = open(f).read().split()
+        if cp == pid:
+            return v == "1"
+    except (OSError, ValueError):
+        pass
+    page, p = False, pid
+    for _ in range(8):
+        out = subprocess.run(["ps", "-o", "ppid=,comm=", "-p", p], capture_output=True, text=True).stdout.split(None, 1)
+        if len(out) < 2:
+            break
+        if "ttyd" in out[1]:
+            page = True
+            break
+        p = out[0]
+        if p in ("0", "1"):
+            break
+    try:
+        os.makedirs(STATE, exist_ok=True)
+        open(f, "w").write(f"{pid} {1 if page else 0}\n")
+    except OSError:
+        pass
+    return page
 
 
 def is_busy(name, mark, cur):
@@ -644,6 +686,9 @@ def main(argv):
         line = {"text": 0, "pad": 1}.get(which, int(which[1:]) if which[1:].isdigit() else 0)
         client, width, cur, names = argv[1], int(argv[2] or 80), argv[3], argv[4]
         rows = tab_rows()
+        global SPIN
+        if line == 0 or rows > 1:
+            SPIN = "" if is_page(client) else SPIN_FRAMES[int(time.time()) % len(SPIN_FRAMES)]
         if rows <= 1:
             if line > 1:
                 print("")
