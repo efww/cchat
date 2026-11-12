@@ -779,12 +779,18 @@ SCRIPT = """<script id="cchat-script">
     }
   };
   setInterval(scanBusy, 1000);
-  setInterval(() => {
+  // 다음 칸 경계 직후로 타이머를 매번 다시 맞춘다. setInterval(150)은 폰에서 타이머가 조금씩 밀리면
+  // 경계 앞뒤로 두 번 걸려 같은 모양이 두 번 나오고 다음 모양을 건너뛰어(삐끗) 보였다.
+  const spinTick = () => {
+    const now = Date.now();
     const el = document.getElementById('cchat-busy');
-    if (!el || !el.firstChild || document.hidden) return;
-    const ch = SPIN[Math.floor(Date.now() / SPIN_MS) % SPIN.length];
-    for (const d of el.children) d.textContent = ch;
-  }, SPIN_MS);
+    if (el && el.firstChild && !document.hidden) {
+      const ch = SPIN[Math.floor(now / SPIN_MS) % SPIN.length];
+      for (const d of el.children) if (d.textContent !== ch) d.textContent = ch;
+    }
+    setTimeout(spinTick, SPIN_MS - (now % SPIN_MS) + 5);
+  };
+  spinTick();
 
   // 웹 푸시 알림(PC·안드로이드 Chrome): 원격 중계가 ./sw.js와 ./push/key를 내줄 때만 켜진다(이 맥 주소로 바로 열면 404라 아무것도 안 함).
   // 허락 전이면 오른쪽 위에 '알림 켜기' 버튼을 띄우고(× 로 숨김), 허락돼 있으면 열 때마다 구독을 중계에 다시 알린다.
