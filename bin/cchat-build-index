@@ -1016,7 +1016,11 @@ def settings() -> dict:
         snips = []
     rows = setting("tab.rows", "1")
     rows = min(5, max(1, int(rows))) if rows.isdigit() else 1
-    return {"statusRows": 2 if rows <= 1 else rows, "tabRows": rows, "fontPc": font_px("font.pc"), "fontPhone": font_px("font.phone"), "snips": snips,
+    try:  # 상태줄 줄 수는 탭 높이에 따라 달라져 cchat-tabs가 계산한 값을 쓴다
+        lines = int(subprocess.run(["@@HOME@@/.local/bin/cchat-tabs", "lines"], capture_output=True, text=True, timeout=5).stdout.strip())
+    except (OSError, ValueError, subprocess.SubprocessError):
+        lines = 2 if rows <= 1 else rows
+    return {"statusRows": lines, "tabRows": rows, "fontPc": font_px("font.pc"), "fontPhone": font_px("font.phone"), "snips": snips,
             "themePc": theme("theme.pc", "light"), "themePhone": theme("theme.phone", "dark")}
 
 

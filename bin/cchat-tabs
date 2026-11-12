@@ -17,6 +17,8 @@
       attention = 확인할 대화(주황 먼저, 없으면 녹색). 폰 키 바의 ★도 Alt+A를 보낸다.
   cchat-tabs apply
       cchat-set tab rows N 값에 맞춰 tmux 상태줄 줄 수를 바꾼다(1 → 2줄 높이 탭, 2~5 → 한 줄짜리 탭을 N줄에 배치).
+  cchat-tabs lines
+      지금 설정의 상태줄 줄 수(브라우저 페이지가 탭 줄 영역을 알 때 쓴다).
   cchat-tabs click <client> _new
       맨 끝 + 칸: 빈 번호로 새 대화를 만들어 옮긴다. 넘쳐서 ◀ ▶가 생기면 그 뒤에 숨은 확인할 대화 수를 화살표 색·숫자로 보여 준다.
 """
@@ -364,9 +366,60 @@ def tab_rows():
     return min(5, max(1, int(v))) if v.isdigit() else 1
 
 
+def tab_height():
+    """cchat-set tab height H: 여러 줄 모드에서 탭 한 줄의 높이(1 = 글자 한 줄). 0.5 단위 권장(1/8칸까지 계산)."""
+    try:
+        h = float(setting("tab.height", "1"))
+    except ValueError:
+        h = 1.0
+    return min(5.0, max(1.0, h))
+
+
+MAX_LINES = 5  # tmux 상태줄 최대 줄 수
+
+
+def layout():
+    """여러 줄 모드의 세로 배치(1/8줄 단위). 반환 (줄 수 L, 시작 o, 탭 높이 b, 줄 간격 P, 줄별 글자줄 번호 목록).
+    탭 줄 i는 [o+i*P, o+i*P+b) 구간을 칠하고, 그 안에 통째로 들어가는 줄 하나에 글자를 쓴다(가운데에 가장 가까운 줄).
+    한 칸은 위·아래 두 색만 가질 수 있어서, 높이가 정수가 아니면 탭 줄마다 줄을 올림한 간격 P를 주고 남는 1/8들을 틈으로 쓴다
+    (틈이 있어야 위아래 탭이 같은 색일 때도 갈라져 보인다). 그게 상태줄 5줄에 안 들어가면 틈 없이 붙인다(P=b, 글자줄 간격이 고르지 않음)."""
+    rows = tab_rows()
+    b = max(8, min(round(tab_height() * 8), MAX_LINES * 8 // rows))
+
+    def fit(L, P, b):
+        best = None
+        for o in range(0, 8 * L - ((rows - 1) * P + b) + 1):
+            texts, cost = [], 0
+            for i in range(rows):
+                s0 = o + i * P
+                e0 = s0 + b
+                cand = [t for t in range(L) if 8 * t >= s0 and 8 * t + 8 <= e0]
+                if not cand:
+                    break
+                t = min(cand, key=lambda t: abs(8 * t + 4 - (s0 + e0) / 2))
+                texts.append(t)
+                cost += abs(8 * t + 4 - (s0 + e0) / 2)
+            else:
+                if best is None or cost < best[0]:
+                    best = (cost, (L, o, b, P, texts))
+        return best and best[1]
+
+    P = -(-b // 8) * 8
+    L = -(-((rows - 1) * P + b) // 8)
+    if L <= MAX_LINES:
+        r = fit(L, P, b)
+        if r:
+            return r
+    while True:  # 틈 없이 붙이기. 이 높이로 줄마다 글자줄을 못 잡으면 조금씩 낮춘다(b=8이면 항상 된다)
+        r = fit(-(-rows * b // 8), b, b)
+        if r:
+            return r
+        b -= 1
+
+
 def status_lines():
     rows = tab_rows()
-    return 2 if rows <= 1 else rows
+    return 2 if rows <= 1 else layout()[0]
 
 
 def row_box(name, unread, cur, w):
@@ -398,6 +451,71 @@ def render_rows(width, cur, tabs, rows, line):
         used = len(chunk) * share + GAP * max(0, len(chunk) - 1)
         out += " " * max(GAP, avail - used + GAP) + plus_box()
     return out + PLAIN
+
+
+STATUS_BG = 67  # config/tmux.conf status-style bg
+LOWER = " ▁▂▃▄▅▆▇"  # 아래 k/8 칸 블록
+
+
+def row_cells(width, cur, tabs, rows, line):
+    """탭 줄 하나의 칸별 (바탕 색 번호, 클릭 범위). 탭 사이·빈 곳은 (상태줄 바탕, None)."""
+    k = max(1, -(-len(tabs) // rows))
+    avail = width - PLUS_W - GAP
+    share = max(TAB_W, (avail - GAP * (k - 1)) // k)
+    cells_, chunk = [], tabs[line * k:(line + 1) * k]
+    for j, (n, u) in enumerate(chunk):
+        if j:
+            cells_ += [(STATUS_BG, None)] * GAP
+        cells_ += [(bg_of(style_of(n, u, cur)), n)] * share
+    if line == rows - 1:
+        cells_ += [(STATUS_BG, None)] * max(GAP, avail - len(cells_) + GAP)
+        cells_ += [(bg_of(ARROW_ON), "_new")] * PLUS_W
+    return (cells_ + [(STATUS_BG, None)] * width)[:width]
+
+
+def bg_of(style):
+    return int(style.split("bg=colour")[1].split(",")[0].split("]")[0])
+
+
+def render_tall(width, cur, tabs, line):
+    """높이를 키운 여러 줄 모드의 상태줄 한 줄: 글자줄이면 그 탭 줄, 아니면 위·아래 탭 줄 색을 블록 문자로 나눠 칠한다."""
+    rows = tab_rows()
+    L, o, b, P, texts = layout()
+    if line >= L:
+        return ""
+    if line in texts:
+        return render_rows(width, cur, tabs, rows, texts.index(line))
+    top, bot = 8 * line, 8 * line + 8
+
+    def owner(y):  # 1/8줄 위치 y를 칠하는 탭 줄(없으면 None = 여백)
+        i, r = divmod(y - o, P)
+        return i if y >= o and i < rows and r < b else None
+
+    # 이 줄 안에서 위→아래로 바뀌는 지점은 한 번뿐이다(탭 높이 >= 1줄, 틈 < 1줄).
+    up = owner(top)
+    split = next((y for y in range(top + 1, bot) if owner(y) != up), bot)
+    dn = owner(bot - 1)
+    k = bot - split  # 아래쪽 1/8 수
+    blank = [(STATUS_BG, None)] * width
+    uc = row_cells(width, cur, tabs, rows, up) if up is not None else blank
+    dc = row_cells(width, cur, tabs, rows, dn) if dn is not None else blank
+    out, run = [], None
+    for (ub, ur), (db, dr) in zip(uc, dc):
+        rng = (ur or dr) if 8 - k >= k else (dr or ur)  # 클릭은 더 넓게 칠한 쪽 탭
+        cell = (" ", ub, ub, rng) if k == 0 or ub == db else (LOWER[k], db, ub, rng)
+        if run and run[0][1:] == cell[1:]:
+            run[1] += 1
+        else:
+            if run:
+                out.append(run)
+            run = [cell, 1]
+    if run:
+        out.append(run)
+    s = ""
+    for (ch, fg, bg, rng), n in out:
+        body = f"#[bg=colour{bg},fg=colour{fg}]{ch * n}"
+        s += f"#[range=user|{rng}]{body}#[norange]" if rng else body
+    return s + PLAIN
 
 
 def apply_rows():
@@ -492,7 +610,9 @@ def main(argv):
             PAD_LINE = line == 1
             print(render(client, width, cur, parse(names)))
         else:
-            print(render_rows(width, cur, parse(names), rows, line) if line < rows else "")
+            print(render_tall(width, cur, parse(names), line))
+    elif argv[:1] == ["lines"]:
+        print(status_lines())
     elif argv[:1] == ["apply"]:
         apply_rows()
     elif len(argv) == 3 and argv[0] == "go":
