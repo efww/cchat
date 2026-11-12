@@ -13,6 +13,7 @@ launchctl kickstart -k gui/$(id -u)/@@LAUNCHD_PREFIX@@.ttyd 로 ttyd를 다시 �
 """
 import json
 import subprocess
+import sys
 import time
 import urllib.request
 from pathlib import Path
@@ -1078,5 +1079,22 @@ def main() -> None:
     print(f"wrote {OUT} ({len(html)} chars)")
 
 
+TERMUX_KEYS = ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white", "brightBlack", "brightRed",
+               "brightGreen", "brightYellow", "brightBlue", "brightMagenta", "brightCyan", "brightWhite"]
+
+
+def termux_colors(name: str) -> str:
+    """Termux(안드) ~/.termux/colors.properties. 페이지와 같은 색표(탭 줄 colour60~70 포함)라 ssh로 붙어도 같게 보인다."""
+    t = DARK if name == "dark" else LIGHT
+    out = [f"# cchat {name} — cchat-build-index --termux {name}", f"background={t['background']}",
+           f"foreground={t['foreground']}", f"cursor={t['cursor']}"]
+    out += [f"color{i}={t[k]}" for i, k in enumerate(TERMUX_KEYS)]
+    out += [f"color{i + 16}={c}" for i, c in enumerate(t["extendedAnsi"])]
+    return "\n".join(out) + "\n"
+
+
 if __name__ == "__main__":
-    main()
+    if sys.argv[1:2] == ["--termux"]:
+        print(termux_colors(sys.argv[2] if len(sys.argv) > 2 else "dark"), end="")
+    else:
+        main()
