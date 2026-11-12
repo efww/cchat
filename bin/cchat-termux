@@ -2,10 +2,13 @@
 """Termux(안드)에서 cchat에 붙는다. 폰 Termux에 복사해서 쓰는 스크립트(맥에서는 안 씀).
   cchat-termux 사용자@맥주소          ssh로 붙기
   cchat-termux 사용자@맥주소 --mosh   mosh로 붙기(터치·스크롤 고침 포함)
+  cchat-termux --shell                Termux 셸 전체를 감싸 어디서나 🎤(Codex·Gemini·다른 ssh 등). 맥 주소는 ~/.config/cchat-termux/host
+                                      ~/.bashrc 맨 위: [ -z "$CCHAT_VOICE" ] && [ -t 0 ] && cchat-termux --shell && exit   (실패하면 그냥 셸)
   설치(Termux): pkg install -y python termux-api && ssh 사용자@맥주소 cat .local/bin/cchat-termux > $PREFIX/bin/cchat-termux && chmod +x $PREFIX/bin/cchat-termux
+  --shell은 맥 ssh 키 로그인이 필요하다(녹음을 보낼 때 비밀번호를 물을 수 없음): ssh-keygen 후 공개키를 맥 ~/.ssh/authorized_keys에.
 
 음성 입력: Termux 키 줄의 F12(🎤)를 누르면 창 없이 녹음(termux-microphone-record), 한 번 더 누르면 녹음을 끝내고
-그 파일을 ssh로 맥의 cchat-stt(whisper.cpp, 한국어)에 넘겨 받은 글을 claude 입력칸에 넣는다(보내지는 않음).
+그 파일을 ssh로 맥의 cchat-stt(whisper.cpp, 한국어)에 넘겨 받은 글을 지금 입력칸(claude·codex·셸 무엇이든)에 넣는다(보내지는 않음).
 녹음·변환 중 ⏎를 누르면 녹음을 끝내고 글을 넣은 뒤 바로 보낸다. 상태는 토스트로 알린다. Termux:API 앱과 마이크 권한이 필요하다. 창이 안 떠서 키보드도 다시 올라오지 않는다.
 (폰 음성 인식은 창 없는 쪽(termux-speech-to-text)이 영어로 고정돼 있고, 창 있는 쪽은 닫힐 때 키보드를 올려서 안 쓴다.)
 ssh는 접속을 함께 쓰도록(ControlMaster) 열어 녹음 파일을 보낼 때 다시 로그인하지 않는다.
@@ -17,12 +20,28 @@ Termux가 1000·1002를 알아듣지만, mosh는 마지막 모드(1003)만 넘�
 import fcntl, os, pty, select, signal, subprocess, sys, termios, time, tty
 
 args = [a for a in sys.argv[1:] if not a.startswith("--")]
+shell = "--shell" in sys.argv
+HOSTF = os.path.expanduser("~/.config/cchat-termux/host")
+if shell:
+    try:
+        args = [os.environ.get("CCHAT_HOST") or open(HOSTF).read().strip()]
+    except OSError:
+        args = []
+    if not args or not args[0]:
+        print(f"맥 주소가 없습니다: echo 사용자@맥주소 > {HOSTF}"); os.execvp("bash", ["bash", "-l"])
 if not args or "-h" in sys.argv or "--help" in sys.argv:
     print(__doc__.strip()); sys.exit(2)
 host, mosh = args[0], "--mosh" in sys.argv
 TMUX = ["/opt/homebrew/bin/tmux", "-u", "-L", "cchat", "attach"]  # brew가 /usr/local이면 고친다
 SSHO = ["-o", "ControlMaster=auto", "-o", "ControlPath=~/.ssh/cchat-%C", "-o", "ControlPersist=300"]
-cmd = (["mosh", "--server=/opt/homebrew/bin/mosh-server", host, "--"] + TMUX) if mosh else ["ssh", "-t"] + SSHO + [host, " ".join(TMUX)]
+if shell:
+    cmd = [os.environ.get("SHELL") or "bash"]  # 대화형(로그인 아님) → ~/.bashrc를 읽어 별칭이 산다
+elif mosh:
+    cmd = ["mosh", "--server=/opt/homebrew/bin/mosh-server", host, "--"] + TMUX
+else:
+    cmd = ["ssh", "-t"] + SSHO + [host, " ".join(TMUX)]
+# 이미 --shell로 감싼 셸 안이면 🎤는 바깥이 처리한다(F12가 여기까지 오지 않음). 안쪽 셸이 다시 감싸지 않게 표시를 넘긴다.
+os.environ["CCHAT_VOICE"] = "1"
 REC = os.path.expanduser("~/.cache/cchat-termux-rec.m4a")
 STT = ".local/bin/cchat-stt"  # 맥 홈 기준(ssh 명령은 홈에서 돈다)
 
