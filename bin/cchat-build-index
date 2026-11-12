@@ -117,8 +117,8 @@ LIGHT["extendedAnsi"] = with_tab_colors(base_extended_ansi(), "light")
 # 폰 키 바. ★ = Alt+A(확인할 대화로), ⋯ = 아래 MORE 줄 열기/닫기. "@이름"은 페이지가 처리하는 동작.
 KEYS = [["★", "\u001ba"], ["Esc", "\u001b"], ["⇧Tab", "\u001b[Z"], ["Tab", "\t"], ["↑", "\u001b[A"],
         ["↓", "\u001b[B"], ["^C", "\u0003"], ["⇧⏎", "\u001b\r"], ["⏎", "\r"], ["⋯", "@more"]]
-# ⋯ 줄: ☰ = Alt+O(전체 모아보기), 🎤 음성 입력, ✎ 자주 쓰는 지시문(cchat-snip), 📎 사진·파일(원격 중계가 있을 때만)
-MORE = [["☰", "\u001bo"], ["←", "\u001b[D"], ["→", "\u001b[C"], ["🎤", "@voice"], ["✎", "@snip"], ["📎", "@attach"]]
+# ⋯ 줄: ☰ = Alt+L(Claude 세션 목록, cchat-ls), 🎤 음성 입력, ✎ 자주 쓰는 지시문(cchat-snip), 📎 사진·파일(원격 중계가 있을 때만)
+MORE = [["☰", "\u001bl"], ["←", "\u001b[D"], ["→", "\u001b[C"], ["🎤", "@voice"], ["✎", "@snip"], ["📎", "@attach"]]
 
 # 홈 화면 앱(PWA): 원격 중계가 ./manifest.json을 내줄 때만 설치 가능(이 맥 주소로 바로 열면 404, 무해)
 MANIFEST = ('<link rel="manifest" href="./manifest.json">'
@@ -701,6 +701,7 @@ SCRIPT = """<script id="cchat-script">
       let seq = null;
       const m = /^Digit([0-9])$/.exec(e.code);
       if (m) seq = '\u001b' + m[1];
+      else if (e.code === 'KeyL') seq = '\u001bl';  // Alt+L = 세션 목록(맥 Option+L은 ¬가 돼 버려서)
       else if (e.code === 'ArrowLeft') seq = '\u001b[1;3D';
       else if (e.code === 'ArrowRight') seq = '\u001b[1;3C';
       // Alt+↑/↓ = 위/아래 칸 탭: 여러 줄 모드(tab rows 2~5)에서만. 1줄 모드는 그대로 claude에 보낸다.
