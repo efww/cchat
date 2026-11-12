@@ -1093,8 +1093,22 @@ def termux_colors(name: str) -> str:
     return "\n".join(out) + "\n"
 
 
+def osc_colors(name: str) -> str:
+    """같은 색표를 터미널에 직접 거는 이스케이프(OSC 4/10/11/12). 색표 설정이 16색까지뿐인 터미널(윈도우 터미널 등)용.
+    attach 전에 출력하면 그 창에만 적용된다. 되돌리기: --osc reset."""
+    if name == "reset":
+        return "\033]104\007\033]110\007\033]111\007\033]112\007"
+    t = DARK if name == "dark" else LIGHT
+    rgb = lambda h: "rgb:%s/%s/%s" % (h[1:3], h[3:5], h[5:7])
+    pal = [t[k] for k in TERMUX_KEYS] + t["extendedAnsi"]
+    return ("".join(f"\033]4;{i};{rgb(c)}\007" for i, c in enumerate(pal))
+            + f"\033]10;{rgb(t['foreground'])}\007\033]11;{rgb(t['background'])}\007\033]12;{rgb(t['cursor'])}\007")
+
+
 if __name__ == "__main__":
     if sys.argv[1:2] == ["--termux"]:
         print(termux_colors(sys.argv[2] if len(sys.argv) > 2 else "dark"), end="")
+    elif sys.argv[1:2] == ["--osc"]:
+        sys.stdout.write(osc_colors(sys.argv[2] if len(sys.argv) > 2 else "dark"))
     else:
         main()
