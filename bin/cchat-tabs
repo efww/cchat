@@ -274,6 +274,8 @@ def box(style, text, w, rng=None, busy=False):
 
 SPIN = ""  # 페이지가 아닌 클라이언트일 때 이번 스피너 글자(main에서 정함)
 SPIN_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+# 넘칠 때 양 끝 화살표. 브라우저(맥·폰 글꼴)는 ◀ ▶를 이모지 글꼴로 크게 그려서 작은 ◂ ▸를 쓴다. 터미널(Termux)은 ◀ ▶가 알맞다
+ARROWS = "◀▶"
 
 
 def is_page(client):
@@ -401,8 +403,8 @@ def render(client, width, cur, tabs):
     shown = tabs[ofs:ofs + cnt]
     ws = [minw(n) for n, _ in shown]  # 고정폭 그대로(남는 칸은 ▶ 앞 빈칸)
     rest = max(0, area - sum(ws) - GAP * (len(ws) - 1))
-    left = arrow("◀", tabs[:ofs], cur, "_prev")
-    right = arrow("▶", tabs[ofs + cnt:], cur, "_next")
+    left = arrow(ARROWS[0], tabs[:ofs], cur, "_prev")
+    right = arrow(ARROWS[1], tabs[ofs + cnt:], cur, "_next")
     mid = (" " * GAP).join(box(style_of(n, u, cur), label(n), w, n, is_busy(n, u, cur)) for (n, u), w in zip(shown, ws))
     return f"{left}{' ' * GAP}{mid}{' ' * (GAP + rest)}{right}{' ' * GAP}{plus_box()}"
 
@@ -691,9 +693,11 @@ def main(argv):
         line = {"text": 0, "pad": 1}.get(which, int(which[1:]) if which[1:].isdigit() else 0)
         client, width, cur, names = argv[1], int(argv[2] or 80), argv[3], argv[4]
         rows = tab_rows()
-        global SPIN
+        global SPIN, ARROWS
         if line == 0 or rows > 1:
-            SPIN = "" if is_page(client) else "▶" if setting("tab.busy", "spinner") == "play" \
+            page = is_page(client)
+            ARROWS = "◂▸" if page else "◀▶"
+            SPIN = "" if page else "▶" if setting("tab.busy", "spinner") == "play" \
                 else SPIN_FRAMES[int(time.time()) % len(SPIN_FRAMES)]
         if rows <= 1:
             if line > 1:
