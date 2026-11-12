@@ -411,7 +411,10 @@ def run_tui(client):
                     hit[y] = (i, w - 1 - cells("[끄기]") if k == 1 else None)
                 y += 1
             if msg:
-                scr.addnstr(h - 1, 0, clip(msg, w - 1), w - 1, curses.A_BOLD)
+                try:
+                    scr.addstr(h - 1, 0, clip(msg, w - 1), curses.A_BOLD)
+                except curses.error:
+                    pass
             scr.refresh()
             try:
                 ch = scr.get_wch()
@@ -423,6 +426,7 @@ def run_tui(client):
                 continue
             msg = ""
             items = rows + other
+            ch = KOR.get(ch, ch) if isinstance(ch, str) else ch  # 한글 입력 상태에서 눌러도 같은 키로
             if ch in ("q", "\x1b", curses.KEY_EXIT):
                 return
             if ch in (curses.KEY_UP, "k"):
@@ -471,11 +475,19 @@ def run_tui(client):
     curses.wrapper(main)
 
 
+# 두벌식 자판에서 같은 자리 한글 → 영문 키(q ㅂ, x ㅌ, d ㅇ, r ㄱ, j ㅓ, k ㅏ, y ㅛ)
+KOR = {"ㅂ": "q", "ㅌ": "x", "ㅇ": "d", "ㄱ": "r", "ㅓ": "j", "ㅏ": "k", "ㅛ": "y", "ㅃ": "q", "ㄲ": "r"}
+
+
 def confirm_kill(scr, r):
     h, w = scr.getmaxyx()
     what = f"{r['num']}번 탭을 닫을까요? (대화는 cchat-history로 다시 열 수 있음)" if r["kind"] == "cchat" \
         else f"claude {r['pid']} ({r['label']})를 끌까요?"
-    scr.addnstr(h - 1, 0, clip(what + "  y=예 / 다른 키=아니오", w - 1) + " " * w, w - 1, curses.A_REVERSE)
+    line = clip(what + "  y=예 / 다른 키=아니오", w - 1)
+    try:  # addnstr의 길이는 글자 수라 한글(두 칸)이 있으면 칸 기준으로 채워야 넘치지 않는다
+        scr.addstr(h - 1, 0, line + " " * max(0, w - 1 - cells(line)), curses.A_REVERSE)
+    except curses.error:
+        pass
     scr.refresh()
     scr.timeout(-1)
     while True:
