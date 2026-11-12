@@ -483,7 +483,7 @@ def confirm_kill(scr, r):
     h, w = scr.getmaxyx()
     what = f"{r['num']}번 탭을 닫을까요? (대화는 cchat-history로 다시 열 수 있음)" if r["kind"] == "cchat" \
         else f"claude {r['pid']} ({r['label']})를 끌까요?"
-    line = clip(what + "  y=예 / 다른 키=아니오", w - 1)
+    line = clip(what + "  ⏎·y=예 / 다른 키=아니오", w - 1)
     try:  # addnstr의 길이는 글자 수라 한글(두 칸)이 있으면 칸 기준으로 채워야 넘치지 않는다
         scr.addstr(h - 1, 0, line + " " * max(0, w - 1 - cells(line)), curses.A_REVERSE)
     except curses.error:
@@ -503,7 +503,7 @@ def confirm_kill(scr, r):
             continue
         break
     scr.timeout(2000)
-    return ch in ("y", "Y", "ㅛ")
+    return ch in ("y", "Y", "ㅛ", "\n", "\r", curses.KEY_ENTER)
 
 
 def go(r, client):
