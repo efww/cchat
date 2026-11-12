@@ -55,11 +55,32 @@ Update: `git pull && ./install.sh -c my.conf`. Uninstall and details: [INSTALL.m
   - The label row ends with the time a working tab has been busy (`3m`) or the conversation size (`42k` tokens)
   - **+** at the end opens a new session; when tabs overflow, ◀ ▶ show how many hidden tabs need you (`▶2`)
 - **Desktop shortcuts**: Alt(Option)+number = go to that session, Alt+←/→ = previous/next, Alt+↑/↓ = tab above/below (multi-row tabs), Alt+A = next tab that needs you, Alt+L = Claude session list (time since each tab last worked, overall goal and current step, close; also claude running outside cchat; summaries are prepared in the background with claude haiku when a turn starts or ends), Alt+O = overview of all sessions (screen previews). Shift+Enter = new line (does not send). Ctrl+V pastes your local (browser) clipboard.
-- **Terminal app instead of the browser** (e.g. Termux over ssh): `tmux -u -L cchat attach` shows the same tabs and conversations. For matching colors, save `cchat-build-index --termux dark` (or `light`) as `~/.termux/colors.properties`; in terminals whose color schemes stop at 16 colors (e.g. Windows Terminal), run `cchat-build-index --osc dark` right before attaching (`--osc reset` restores). Termux: tapping the screen does not bring the keyboard back (cchat turns on tmux mouse mode, and Termux sends taps to the program instead), so add a `KEYBOARD` key to `extra-keys` in `~/.termux/termux.properties`. In terminal clients the working spinner is drawn as a character next to the tab number (advances with the 5-second status refresh); `cchat-set tab busy play` shows a still green ▶ instead (the browser always spins). On the phone, `cchat-termux user@mac [--mosh]` (copy it into Termux) connects and adds a 🎤 key (F12 in `extra-keys`) for voice input without opening the keyboard or any window: press to record on the phone (Termux:API), press again to send it to the Mac, where `cchat-stt` (whisper.cpp, Korean by default; `brew install whisper-cpp` plus a model in `~/.cache/cchat-whisper/`) turns it into text in the input box (press Enter instead of 🎤 to stop and send right away); `cchat-termux --shell` wraps the whole Termux shell so 🎤 works in any program (Codex, Gemini, other ssh), given an ssh key login to the Mac; with `--mosh` it also fixes touch and scrolling, which plain mosh breaks for Termux.
+- **Terminal app instead of the browser**: see [Phone terminal (Termux)](#phone-terminal-termux) below.
 - **Phone**: finger-drag scrolling, swipe left/right to change tabs, tap a URL to open it (wrapped URLs too), dark theme. Key bar: ★ = next tab that needs you, Esc, Tab, arrows, ⋯ = session list (☰), voice input, saved prompts (✎), photo/file upload (📎, remote relay only).
 - **Approve with one tap**: when claude shows a numbered choice (permission, question), the numbers appear as buttons.
 - **Helpers you can ask claude to use**: `cchat-send 1 2` (pass tab 1's last answer to tab 2's input), `cchat-history` (find and reopen closed conversations), `cchat-snip` (saved prompts), `cchat-label` (tab names), `cchat-set` (settings).
 - Sessions live inside tmux, so they keep running after you close the browser. Open the URL with `?arg=name` to attach to that session (created if missing).
+
+## How it fits together
+
+The sessions live in tmux on your Mac; every device is just a window onto them, so each one shows the same tabs and the same conversations.
+
+<img src="docs/arch-pc.svg" alt="Desktop browser architecture" width="100%">
+
+<img src="docs/arch-phone.svg" alt="Phone browser architecture" width="100%">
+
+<img src="docs/arch-termux.svg" alt="Phone terminal (Termux) architecture" width="100%">
+
+### Phone terminal (Termux)
+
+Instead of the browser, ssh in from a terminal app and attach to tmux directly (`tmux -u -L cchat attach`, no web in between).
+
+- **Connect script**: copy `bin/cchat-termux` into Termux and run `cchat-termux user@mac` (`--mosh` uses mosh and fixes touch and scrolling, which plain mosh breaks for Termux).
+- **🎤 voice input** (F12 in the key row): press to record on the phone with no window or keyboard (Termux:API), press 🎤 again to send it to the Mac, where `cchat-stt` (whisper.cpp, Korean by default) turns it into text in the input box. Press ⏎ instead of 🎤 to stop and send right away. Needs `brew install whisper-cpp` and a model in `~/.cache/cchat-whisper/` on the Mac; memory is used only while transcribing.
+- **🎤 in any program**: put `[ -z "$CCHAT_VOICE" ] && [ -t 0 ] && cchat-termux --shell && exit` at the top of `~/.bashrc` (Mac address in `~/.config/cchat-termux/host`, ssh key login to the Mac) and it works in Codex, Gemini or any other ssh too.
+- **Key row example** (`~/.termux/termux.properties`): `extra-keys = [[{key: 'F12', display: '🎤'},'KEYBOARD','ALT','UP',{macro: 'ALT ENTER', display: '⇧⏎'},'BKSP'],[{key: 'ENTER', display: '⏎'},'TAB','LEFT','DOWN','RIGHT','ESC']]`. `KEYBOARD` is needed because with tmux mouse mode on, Termux passes screen taps to the program and does not bring the keyboard back.
+- **Colors**: save `cchat-build-index --termux dark` (or `light`) as `~/.termux/colors.properties`. In terminals whose color schemes stop at 16 colors (e.g. Windows Terminal), run `cchat-build-index --osc dark` right before attaching (`--osc reset` restores).
+- **Working mark**: terminals have no page spinner, so it is drawn as a character next to the tab number (one step per 5 s). `cchat-set tab busy play` shows a still green ▶ instead.
 
 ## How to use
 
@@ -81,6 +102,7 @@ Tell claude in any cchat tab, e.g. "dark theme on my PC" or "bigger font on my p
 | `cchat-set tab ctx off` | Hide the conversation size (42k) on tabs |
 | `cchat-set tab rows 2` | Tab rows, 1–5. 1 (default) = each tab is two lines tall (number/name); 2 = two-line tabs (number/name) in 2 rows, 3–5 = one-line tabs spread over that many rows (for many tabs); changing rows resets the height to that default |
 | `cchat-set tab height 1.5` | Tab height in multi-row mode (tab rows 2–5). 1 (default) = one text line, 1.5 = one and a half (padding drawn with block characters), 2 = number on top and name below like the default mode. The status bar holds at most 5 lines, so rows × height is capped |
+| `cchat-set tab busy play` | Working mark in terminal clients (Termux etc.): `spinner` (default, one step per 5 s) or a still green ▶. The browser always spins |
 | `cchat-set font phone 16` / `font pc off` | Font size per device (`off` = `FONT_SIZE`) |
 | `cchat-set theme pc dark` | Light/dark per device (default: PC light, phone dark) |
 | `cchat-set notify on\|off`, `notify pc\|phone\|telegram\|done\|ask on\|off`, `quiet 01-08` | Notifications (needs a notify hook, see below) |
@@ -105,6 +127,10 @@ ttyd listens on 127.0.0.1 only and has **no authentication of its own**. To use 
 | `bin/cchat-ttyd` | Starts ttyd (rebuilds the page after a ttyd upgrade; `KEEP_AWAKE=1` keeps the Mac awake) |
 | `bin/cchat-inbox` | (optional, `INBOX_REMOTE`) pulls files uploaded from the phone |
 | `examples/` | Notification hook examples (ntfy, macOS) |
+| `bin/cchat-ls` | Claude session list (Alt+L, ☰): per tab time since last work, goal, current step, close; summaries prepared with claude haiku |
+| `bin/cchat-termux` | (copy to Termux) ssh/mosh connect + 🎤 voice input, `--shell` wraps the whole shell |
+| `bin/cchat-stt` | Speech to text (whisper.cpp), called over ssh by cchat-termux |
+| `docs/diagrams.py` | Generates the architecture pictures in this README (`docs/arch-*.svg`) |
 | `bin/cchat-label` | Set a session label by hand |
 | `bin/cchat-restart` | Restart claude in every tab (e.g. after an update), resuming each conversation; busy tabs are skipped unless `--all` |
 | `bin/cchat-tunnel` | (optional) reverse SSH tunnel |

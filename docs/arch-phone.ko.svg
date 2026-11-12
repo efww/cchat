@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 392" width="960" height="392" role="img"><title>폰 브라우저</title><style>
+.bg{fill:#ffffff;stroke:#d0d7de}
+.mac{fill:#f6f8fa;stroke:#d0d7de;stroke-dasharray:5 5}
+.macl{fill:#59636e;font-size:12px;font-weight:600;letter-spacing:.08em}
+.n{fill:#ffffff;stroke:#d0d7de}
+.nd{fill:#ffffff;stroke:#0969da;stroke-width:1.5}
+.t{fill:#1f2328;font-size:15px;font-weight:650}
+.s{fill:#59636e;font-size:12px}
+.e{fill:none;stroke:#8c959f;stroke-width:1.5}
+.ea{fill:none;stroke:#0969da;stroke-width:1.75}
+.eg{fill:none;stroke:#1a7f37;stroke-width:1.5;stroke-dasharray:4 4}
+.eo{fill:none;stroke:#bc4c00;stroke-width:1.5;stroke-dasharray:4 4}
+.el{fill:#59636e;font-size:11.5px}
+.ah{fill:#8c959f}.aha{fill:#0969da}.ahg{fill:#1a7f37}.aho{fill:#bc4c00}
+.dot{fill:#0969da}.dotg{fill:#1a7f37}.doto{fill:#bc4c00}
+.k{fill:#f6f8fa;stroke:#d0d7de}.kt{fill:#1f2328;font-size:11px;font-weight:600}
+.tb0{fill:#24292f}.tb1{fill:#d3f0dc}.tb2{fill:#fde4c4}.tb3{fill:#eceef1}
+.title{fill:#1f2328;font-size:17px;font-weight:700}.sub{fill:#59636e;font-size:12.5px}
+@media (prefers-color-scheme: dark){
+.bg{fill:#0d1117;stroke:#30363d}
+.mac{fill:#151b23;stroke:#3d444d}.macl{fill:#9198a1}
+.n{fill:#161b22;stroke:#3d444d}.nd{fill:#161b22;stroke:#4493f8}
+.t{fill:#e6edf3}.s,.el,.sub{fill:#9198a1}.title{fill:#e6edf3}
+.e{stroke:#656c76}.ea{stroke:#4493f8}.eg{stroke:#3fb950}.eo{stroke:#db6d28}
+.ah{fill:#656c76}.aha{fill:#4493f8}.ahg{fill:#3fb950}.aho{fill:#db6d28}
+.dot{fill:#4493f8}.dotg{fill:#3fb950}.doto{fill:#db6d28}
+.k{fill:#21262d;stroke:#3d444d}.kt{fill:#e6edf3}
+.tb0{fill:#e6edf3}.tb1{fill:#173b26}.tb2{fill:#45300f}.tb3{fill:#272e37}
+}
+text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Noto Sans KR",Helvetica,Arial,sans-serif}
+</style><rect class="bg" x=".5" y=".5" width="959" height="391" rx="16"/><text class="title" x="28" y="38">폰 브라우저</text><text class="sub" x="28" y="58">PC와 같은 대화. 키 바, 좌우로 밀어 탭 이동, 링크 톡 열기.</text><rect class="mac" x="392" y="76" width="544" height="292" rx="18"/><text class="macl" x="410" y="98">내 맥</text><rect class="nd" x="24" y="116" width="184" height="124" rx="12"/><text class="t" x="40" y="144">폰 브라우저</text><text class="s" x="40" y="164">밀어서 탭 이동 · 링크 톡</text><text class="s" x="40" y="181">번호 선택지 → 버튼</text><rect class="k" x="40" y="202" width="28" height="22" rx="5"/><text class="kt" x="54.0" y="217" text-anchor="middle">★</text><rect class="k" x="72" y="202" width="28" height="22" rx="5"/><text class="kt" x="86.0" y="217" text-anchor="middle">Esc</text><rect class="k" x="104" y="202" width="28" height="22" rx="5"/><text class="kt" x="118.0" y="217" text-anchor="middle">⇥</text><rect class="k" x="136" y="202" width="28" height="22" rx="5"/><text class="kt" x="150.0" y="217" text-anchor="middle">↑</text><rect class="k" x="168" y="202" width="28" height="22" rx="5"/><text class="kt" x="182.0" y="217" text-anchor="middle">⋯</text><rect class="n" x="236" y="124" width="132" height="76" rx="12"/><text class="t" x="252" y="152">인증 + 서버</text><text class="s" x="252" y="172">예: Cloudflare</text><text class="s" x="252" y="189">Access</text><path id="p1" class="e" d="M208,162 L236,162"/><polygon class="ah" points="236,162 228,157.5 228,166.5"/><rect class="n" x="412" y="116" width="128" height="92" rx="12"/><text class="t" x="428" y="144">ttyd</text><text class="s" x="428" y="164">웹 터미널</text><text class="s" x="428" y="181">127.0.0.1에만</text><rect class="n" x="568" y="116" width="176" height="92" rx="12"/><text class="t" x="584" y="144">tmux</text><text class="s" x="584" y="164">대화 하나 = 탭 하나</text><rect class="tb0" x="584" y="178" width="19" height="10" rx="3"/><rect class="tb1" x="606" y="178" width="19" height="10" rx="3"/><rect class="tb2" x="628" y="178" width="19" height="10" rx="3"/><rect class="tb3" x="650" y="178" width="19" height="10" rx="3"/><rect class="tb3" x="672" y="178" width="19" height="10" rx="3"/><rect class="n" x="772" y="116" width="148" height="92" rx="12"/><text class="t" x="788" y="144">claude × N</text><text class="s" x="788" y="164">내 파일·도구·설정</text><text class="s" x="788" y="181">그대로</text><path id="p2" class="e" d="M540,162 L568,162"/><polygon class="ah" points="568,162 560,157.5 560,166.5"/><path id="p3" class="e" d="M744,162 L772,162"/><polygon class="ah" points="772,162 764,157.5 764,166.5"/><rect class="n" x="568" y="242" width="176" height="64" rx="12"/><text class="t" x="584" y="270">cchat-unread</text><text class="s" x="584" y="290">claude 훅 → 탭 색</text><path id="p4" class="eg" d="M846.0,208 L846.0,274 L744,274"/><polygon class="ahg" points="744,274 752,269.5 752,278.5"/><circle class="dotg" r="3.2"><animateMotion dur="2.6s" repeatCount="indefinite"><mpath href="#p4"/></animateMotion></circle><text class="el" x="854.0" y="238" text-anchor="start">훅</text><path id="p5" class="eg" d="M656.0,242 L656.0,208"/><polygon class="ahg" points="656.0,208 651.5,216 660.5,216"/><circle class="dotg" r="3.2"><animateMotion dur="1.6s" repeatCount="indefinite"><mpath href="#p5"/></animateMotion></circle><text class="el" x="664.0" y="229" text-anchor="start">색</text><path id="p6" class="ea" d="M368,162 L412,162"/><polygon class="aha" points="412,162 404,157.5 404,166.5"/><circle class="dot" r="3.2"><animateMotion dur="2.6s" repeatCount="indefinite"><mpath href="#p6"/></animateMotion></circle><text class="el" x="302" y="220" text-anchor="middle">SSH 역방향 통로</text><rect class="n" x="24" y="270" width="184" height="74" rx="12"/><text class="t" x="40" y="298">알림 훅</text><text class="s" x="40" y="318">ntfy · 웹 푸시 · …</text><text class="s" x="40" y="335">(직접 고름)</text><path id="p7" class="eo" d="M656.0,306 L656.0,358 L116,358 L116,344"/><polygon class="aho" points="116,344 111.5,352 120.5,352"/><circle class="doto" r="3.2"><animateMotion dur="3.2s" repeatCount="indefinite"><mpath href="#p7"/></animateMotion></circle><text class="el" x="330" y="352" text-anchor="middle">안 보고 있으면 알림</text></svg>

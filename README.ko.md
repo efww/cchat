@@ -55,11 +55,32 @@ open "http://127.0.0.1:7681/cchat/?arg=1"
   - 이름표 줄 끝 숫자: 작업 중이면 걸린 시간(`3m`), 끝나면 대화 크기(`42k` 토큰)
   - 끝의 **+** 는 새 대화. 탭이 넘치면 ◀ ▶에 숨은 확인할 탭 수(`▶2`)
 - **PC 단축키**: Alt(Option)+숫자 = 그 번호 대화, Alt+←/→ = 이전/다음, Alt+↑/↓ = 위/아래 칸(탭 2줄 이상일 때), Alt+A = 확인할 다음 탭, Alt+L = Claude 세션 목록(탭마다 마지막 작업 뒤 지난 시간·큰 흐름·지금 하는 일·끄기, cchat 밖 claude 포함. 요약은 답이 끝날 때·지시를 받을 때 claude haiku로 미리 만들어 둠), Alt+O = 전체 모아보기(화면 미리보기). Shift+Enter = 줄바꿈(보내지 않음). Ctrl+V는 PC 클립보드를 붙인다.
-- **브라우저 대신 터미널 앱**(예: 안드 Termux에서 ssh): `tmux -u -L cchat attach`로 같은 탭·대화를 본다. 색을 맞추려면 `cchat-build-index --termux dark`(또는 `light`) 출력을 `~/.termux/colors.properties`로 저장. 색 설정이 16색까지뿐인 터미널(윈도우 터미널 등)은 attach 직전에 `cchat-build-index --osc dark` 실행(`--osc reset`으로 되돌림). Termux는 화면을 탭해도 키보드가 다시 안 올라온다(cchat이 tmux 마우스 모드를 켜 두면 Termux가 탭을 프로그램에 넘김) → `~/.termux/termux.properties`의 `extra-keys`에 `KEYBOARD` 키를 넣는다. 터미널로 붙으면 작업 중 스피너는 탭 번호 옆 글자로 그린다(상태줄 갱신 5초마다 한 칸). `cchat-set tab busy play`면 움직이지 않는 녹색 ▶(브라우저는 늘 스피너). 폰 Termux에는 `cchat-termux 사용자@맥 [--mosh]`를 복사해 쓴다: 키 줄의 🎤(extra-keys의 F12)로 키보드도 창도 없이 음성 입력(누르면 폰이 녹음, 다시 누르면 맥으로 보내 `cchat-stt`가 whisper.cpp로 한국어 글로 바꿔 입력칸에 넣음, 🎤 대신 ⏎면 끝내고 바로 보냄. `cchat-termux --shell`로 Termux 셸 전체를 감싸면 어느 프로그램에서나 🎤(Codex·Gemini·다른 ssh 등, 맥 ssh 키 로그인 필요). 맥에 `brew install whisper-cpp`와 `~/.cache/cchat-whisper/` 모델 필요), `--mosh`면 그냥 mosh에서 안 되는 터치·스크롤도 고친다.
+- **브라우저 대신 터미널 앱**: 아래 [폰 터미널(Termux)](#폰-터미널termux) 참고.
 - **폰**: 손가락 드래그 스크롤, 좌우로 밀어 탭 바꾸기, 주소(URL)를 톡 치면 열기(줄바꿈된 주소 포함), 다크 테마. 키 바: ★ = 확인할 다음 탭, Esc·Tab·화살표, ⋯ = 세션 목록(☰)·음성 입력·저장한 지시문(✎)·사진/파일 올리기(📎, 원격 중계가 있을 때).
 - **한 번에 승인**: claude가 번호 선택지(허락·질문)를 띄우면 번호가 버튼으로 뜬다.
 - **claude에게 시킬 수 있는 도구**: `cchat-send 1 2`(1번 마지막 답을 2번 입력칸에), `cchat-history`(닫은 대화 찾아 다시 열기), `cchat-snip`(지시문 저장), `cchat-label`(탭 이름), `cchat-set`(설정).
 - 대화는 tmux 안에 있어 브라우저를 닫아도 계속 돈다. URL `?arg=이름`으로 그 이름의 대화에 붙는다(없으면 만든다).
+
+## 기기별 구조
+
+대화는 맥의 tmux 안에 있고, 기기는 그 대화를 보는 창일 뿐이다. 그래서 어느 기기로 열어도 같은 탭·같은 대화다.
+
+<img src="docs/arch-pc.ko.svg" alt="PC 브라우저 구조" width="100%">
+
+<img src="docs/arch-phone.ko.svg" alt="폰 브라우저 구조" width="100%">
+
+<img src="docs/arch-termux.ko.svg" alt="폰 터미널(Termux) 구조" width="100%">
+
+### 폰 터미널(Termux)
+
+브라우저 대신 터미널 앱으로 ssh 접속해 tmux에 바로 붙는다(`tmux -u -L cchat attach`, 웹을 거치지 않음).
+
+- **접속 스크립트**: 폰 Termux에 `bin/cchat-termux`를 복사해 `cchat-termux 사용자@맥`으로 붙는다(`--mosh`면 mosh, 그냥 mosh에서 안 되는 터치·스크롤도 고침).
+- **🎤 음성 입력**(키 줄의 F12): 누르면 창·키보드 없이 폰이 녹음(Termux:API), 🎤를 다시 누르면 맥으로 보내 `cchat-stt`(whisper.cpp, 기본 한국어)가 글로 바꿔 입력칸에 넣는다. 🎤 대신 ⏎면 끝내고 바로 보낸다. 맥에 `brew install whisper-cpp`와 `~/.cache/cchat-whisper/` 모델 필요, 메모리는 바꾸는 동안만 쓴다.
+- **어느 프로그램에서나 🎤**: `~/.bashrc` 맨 위에 `[ -z "$CCHAT_VOICE" ] && [ -t 0 ] && cchat-termux --shell && exit`(맥 주소는 `~/.config/cchat-termux/host`, 맥 ssh 키 로그인 필요) → Codex·Gemini·다른 ssh에서도 된다.
+- **키 줄 예**(`~/.termux/termux.properties`): `extra-keys = [[{key: 'F12', display: '🎤'},'KEYBOARD','ALT','UP',{macro: 'ALT ENTER', display: '⇧⏎'},'BKSP'],[{key: 'ENTER', display: '⏎'},'TAB','LEFT','DOWN','RIGHT','ESC']]`. `KEYBOARD`가 필요한 이유: cchat이 tmux 마우스 모드를 켜 두면 Termux는 화면 탭을 프로그램에 넘기고 키보드를 띄우지 않는다.
+- **색**: `cchat-build-index --termux dark`(또는 `light`) 출력을 `~/.termux/colors.properties`로. 색 설정이 16색까지뿐인 터미널(윈도우 터미널 등)은 attach 직전에 `cchat-build-index --osc dark`(`--osc reset`으로 되돌림).
+- **작업 중 표시**: 터미널에서는 페이지 스피너가 없어 탭 번호 옆 글자로 그린다(5초마다 한 칸). `cchat-set tab busy play`면 움직이지 않는 녹색 ▶.
 
 ## 사용법
 
@@ -81,6 +102,7 @@ cchat 탭 아무 데서나 claude에게 "PC는 다크 테마로", "폰 글자 �
 | `cchat-set tab ctx off` | 탭의 대화 크기(42k) 표시 끄기 |
 | `cchat-set tab rows 2` | 탭 줄 수 1~5. 1(기본)은 탭이 2줄 높이(번호/이름), 2는 두 줄 탭(번호/이름)을 2줄, 3~5는 한 줄짜리 탭을 그 줄 수에 배치(탭이 많을 때). 줄 수를 바꾸면 높이도 그 기본값으로 |
 | `cchat-set tab height 1.5` | 여러 줄 모드(tab rows 2~5)의 탭 높이. 1(기본)은 글자 한 줄, 1.5는 한 줄 반(블록 문자로 칠함), 2는 기본 모드처럼 윗줄 번호·아랫줄 이름표. 상태줄은 최대 5줄이라 줄 수×높이가 넘치면 낮춘다 |
+| `cchat-set tab busy play` | 터미널(Termux 등)로 붙었을 때 작업 중 표시: `spinner`(기본, 5초마다 한 칸) 또는 움직이지 않는 녹색 ▶. 브라우저는 늘 스피너 |
 | `cchat-set font phone 16` / `font pc off` | 기기별 글자 크기(`off` = `FONT_SIZE`) |
 | `cchat-set theme pc dark` | 기기별 라이트/다크(기본 PC 라이트, 폰 다크) |
 | `cchat-set notify on\|off`, `notify pc\|phone\|telegram\|done\|ask on\|off`, `quiet 01-08` | 알림(알림 훅 필요, 아래) |
@@ -105,6 +127,10 @@ ttyd는 127.0.0.1에만 열리고 **자체 인증이 없다**. 밖에서 쓰려�
 | `bin/cchat-ttyd` | ttyd 시작(ttyd 업그레이드 뒤 페이지 다시 만들기, `KEEP_AWAKE=1`이면 맥 잠자기 막기) |
 | `bin/cchat-inbox` | (선택, `INBOX_REMOTE`) 폰에서 올린 파일 가져오기 |
 | `examples/` | 알림 훅 예시(ntfy, macOS) |
+| `bin/cchat-ls` | Claude 세션 목록(Alt+L·☰): 탭마다 지난 시간·큰 흐름·지금 일·끄기, 요약은 claude haiku로 미리 |
+| `bin/cchat-termux` | (폰 Termux에 복사) ssh/mosh 접속 + 🎤 음성 입력, `--shell`이면 셸 전체 |
+| `bin/cchat-stt` | 음성 → 글(whisper.cpp), cchat-termux가 ssh로 부름 |
+| `docs/diagrams.py` | 이 README의 구조 그림(`docs/arch-*.svg`) 만들기 |
 | `bin/cchat-label` | 대화 이름표 직접 달기 |
 | `bin/cchat-restart` | claude 다시 시작(업데이트 반영), 대화는 이어서. 작업 중인 탭은 건너뜀(`--all`이면 포함) |
 | `bin/cchat-tunnel` | (선택) SSH 역방향 통로 |

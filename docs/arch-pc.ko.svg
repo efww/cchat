@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 372" width="960" height="372" role="img"><title>PC 브라우저</title><style>
+.bg{fill:#ffffff;stroke:#d0d7de}
+.mac{fill:#f6f8fa;stroke:#d0d7de;stroke-dasharray:5 5}
+.macl{fill:#59636e;font-size:12px;font-weight:600;letter-spacing:.08em}
+.n{fill:#ffffff;stroke:#d0d7de}
+.nd{fill:#ffffff;stroke:#0969da;stroke-width:1.5}
+.t{fill:#1f2328;font-size:15px;font-weight:650}
+.s{fill:#59636e;font-size:12px}
+.e{fill:none;stroke:#8c959f;stroke-width:1.5}
+.ea{fill:none;stroke:#0969da;stroke-width:1.75}
+.eg{fill:none;stroke:#1a7f37;stroke-width:1.5;stroke-dasharray:4 4}
+.eo{fill:none;stroke:#bc4c00;stroke-width:1.5;stroke-dasharray:4 4}
+.el{fill:#59636e;font-size:11.5px}
+.ah{fill:#8c959f}.aha{fill:#0969da}.ahg{fill:#1a7f37}.aho{fill:#bc4c00}
+.dot{fill:#0969da}.dotg{fill:#1a7f37}.doto{fill:#bc4c00}
+.k{fill:#f6f8fa;stroke:#d0d7de}.kt{fill:#1f2328;font-size:11px;font-weight:600}
+.tb0{fill:#24292f}.tb1{fill:#d3f0dc}.tb2{fill:#fde4c4}.tb3{fill:#eceef1}
+.title{fill:#1f2328;font-size:17px;font-weight:700}.sub{fill:#59636e;font-size:12.5px}
+@media (prefers-color-scheme: dark){
+.bg{fill:#0d1117;stroke:#30363d}
+.mac{fill:#151b23;stroke:#3d444d}.macl{fill:#9198a1}
+.n{fill:#161b22;stroke:#3d444d}.nd{fill:#161b22;stroke:#4493f8}
+.t{fill:#e6edf3}.s,.el,.sub{fill:#9198a1}.title{fill:#e6edf3}
+.e{stroke:#656c76}.ea{stroke:#4493f8}.eg{stroke:#3fb950}.eo{stroke:#db6d28}
+.ah{fill:#656c76}.aha{fill:#4493f8}.ahg{fill:#3fb950}.aho{fill:#db6d28}
+.dot{fill:#4493f8}.dotg{fill:#3fb950}.doto{fill:#db6d28}
+.k{fill:#21262d;stroke:#3d444d}.kt{fill:#e6edf3}
+.tb0{fill:#e6edf3}.tb1{fill:#173b26}.tb2{fill:#45300f}.tb3{fill:#272e37}
+}
+text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Noto Sans KR",Helvetica,Arial,sans-serif}
+</style><rect class="bg" x=".5" y=".5" width="959" height="371" rx="16"/><text class="title" x="28" y="38">PC 브라우저</text><text class="sub" x="28" y="58">아래 탭과 Alt 단축키. 브라우저를 닫아도 대화는 tmux에서 계속 돈다.</text><rect class="mac" x="312" y="76" width="624" height="272" rx="18"/><text class="macl" x="330" y="98">내 맥</text><rect class="nd" x="24" y="116" width="186" height="92" rx="12"/><text class="t" x="40" y="144">PC 브라우저</text><text class="s" x="40" y="164">탭 클릭 · Alt+숫자</text><text class="s" x="40" y="181">Alt+L 세션 목록</text><rect class="n" x="336" y="116" width="150" height="92" rx="12"/><text class="t" x="352" y="144">ttyd</text><text class="s" x="352" y="164">웹 터미널</text><text class="s" x="352" y="181">127.0.0.1에만</text><rect class="n" x="522" y="116" width="196" height="92" rx="12"/><text class="t" x="538" y="144">tmux</text><text class="s" x="538" y="164">대화 하나 = 탭 하나</text><rect class="tb0" x="538" y="178" width="19" height="10" rx="3"/><rect class="tb1" x="560" y="178" width="19" height="10" rx="3"/><rect class="tb2" x="582" y="178" width="19" height="10" rx="3"/><rect class="tb3" x="604" y="178" width="19" height="10" rx="3"/><rect class="tb3" x="626" y="178" width="19" height="10" rx="3"/><rect class="n" x="754" y="116" width="168" height="92" rx="12"/><text class="t" x="770" y="144">claude × N</text><text class="s" x="770" y="164">내 파일·도구·설정</text><text class="s" x="770" y="181">그대로</text><path id="p1" class="e" d="M486,162 L522,162"/><polygon class="ah" points="522,162 514,157.5 514,166.5"/><path id="p2" class="e" d="M718,162 L754,162"/><polygon class="ah" points="754,162 746,157.5 746,166.5"/><rect class="n" x="522" y="242" width="196" height="64" rx="12"/><text class="t" x="538" y="270">cchat-unread</text><text class="s" x="538" y="290">claude 훅 → 탭 색</text><path id="p3" class="eg" d="M838.0,208 L838.0,274 L718,274"/><polygon class="ahg" points="718,274 726,269.5 726,278.5"/><circle class="dotg" r="3.2"><animateMotion dur="2.6s" repeatCount="indefinite"><mpath href="#p3"/></animateMotion></circle><text class="el" x="846.0" y="238" text-anchor="start">훅</text><path id="p4" class="eg" d="M620.0,242 L620.0,208"/><polygon class="ahg" points="620.0,208 615.5,216 624.5,216"/><circle class="dotg" r="3.2"><animateMotion dur="1.6s" repeatCount="indefinite"><mpath href="#p4"/></animateMotion></circle><text class="el" x="628.0" y="229" text-anchor="start">색</text><path id="p5" class="ea" d="M210,150 L336,150"/><polygon class="aha" points="336,150 328,145.5 328,154.5"/><circle class="dot" r="3.2"><animateMotion dur="2.6s" repeatCount="indefinite"><mpath href="#p5"/></animateMotion></circle><text class="el" x="273" y="142" text-anchor="middle">같은 맥: localhost</text><path id="p6" class="e" d="M336,178 L210,178"/><polygon class="ah" points="210,178 218,173.5 218,182.5"/><text class="el" x="273" y="196" text-anchor="middle">밖에서: 인증 + 통로</text><rect class="n" x="24" y="246" width="186" height="74" rx="12"/><text class="t" x="40" y="274">알림 훅</text><text class="s" x="40" y="294">ntfy · 웹 푸시 · …</text><text class="s" x="40" y="311">(직접 고름)</text><path id="p7" class="eo" d="M620.0,306 L620.0,336 L117,336 L117,320"/><polygon class="aho" points="117,320 112.5,328 121.5,328"/><circle class="doto" r="3.2"><animateMotion dur="3.2s" repeatCount="indefinite"><mpath href="#p7"/></animateMotion></circle><text class="el" x="330" y="330" text-anchor="middle">안 보고 있으면 알림</text></svg>
