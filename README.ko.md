@@ -55,7 +55,7 @@ open "http://127.0.0.1:7681/cchat/?arg=1"
   - 이름표 줄 끝 숫자: 작업 중이면 걸린 시간(`3m`), 끝나면 대화 크기(`42k` 토큰)
   - 끝의 **+** 는 새 대화. 탭이 넘치면 ◀ ▶에 숨은 확인할 탭 수(`▶2`)
 - **PC 단축키**: Alt(Option)+숫자 = 그 번호 대화, Alt+←/→ = 이전/다음, Alt+↑/↓ = 위/아래 칸(탭 2줄 이상일 때), Alt+A = 확인할 다음 탭, Alt+L = Claude 세션 목록(탭마다 마지막 작업 뒤 지난 시간·큰 흐름·지금 하는 일·끄기, cchat 밖 claude 포함. 요약은 답이 끝날 때·지시를 받을 때 claude haiku로 미리 만들어 둠), Alt+O = 전체 모아보기(화면 미리보기). Shift+Enter = 줄바꿈(보내지 않음). Ctrl+V는 PC 클립보드를 붙인다.
-- **브라우저 대신 터미널 앱**(예: 안드 Termux에서 ssh): `tmux -u -L cchat attach`로 같은 탭·대화를 본다. 색을 맞추려면 `cchat-build-index --termux dark`(또는 `light`) 출력을 `~/.termux/colors.properties`로 저장. 색 설정이 16색까지뿐인 터미널(윈도우 터미널 등)은 attach 직전에 `cchat-build-index --osc dark` 실행(`--osc reset`으로 되돌림).
+- **브라우저 대신 터미널 앱**(예: 안드 Termux에서 ssh): `tmux -u -L cchat attach`로 같은 탭·대화를 본다. 색을 맞추려면 `cchat-build-index --termux dark`(또는 `light`) 출력을 `~/.termux/colors.properties`로 저장. 색 설정이 16색까지뿐인 터미널(윈도우 터미널 등)은 attach 직전에 `cchat-build-index --osc dark` 실행(`--osc reset`으로 되돌림). Termux는 화면을 탭해도 키보드가 다시 안 올라온다(cchat이 tmux 마우스 모드를 켜 두면 Termux가 탭을 프로그램에 넘김) → `~/.termux/termux.properties`의 `extra-keys`에 `KEYBOARD` 키를 넣는다.
 - **폰**: 손가락 드래그 스크롤, 좌우로 밀어 탭 바꾸기, 주소(URL)를 톡 치면 열기(줄바꿈된 주소 포함), 다크 테마. 키 바: ★ = 확인할 다음 탭, Esc·Tab·화살표, ⋯ = 세션 목록(☰)·음성 입력·저장한 지시문(✎)·사진/파일 올리기(📎, 원격 중계가 있을 때).
 - **한 번에 승인**: claude가 번호 선택지(허락·질문)를 띄우면 번호가 버튼으로 뜬다.
 - **claude에게 시킬 수 있는 도구**: `cchat-send 1 2`(1번 마지막 답을 2번 입력칸에), `cchat-history`(닫은 대화 찾아 다시 열기), `cchat-snip`(지시문 저장), `cchat-label`(탭 이름), `cchat-set`(설정).
