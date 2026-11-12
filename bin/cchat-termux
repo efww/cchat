@@ -6,7 +6,7 @@
 
 음성 입력: Termux 키 줄의 F12(🎤)를 누르면 창 없이 녹음(termux-microphone-record), 한 번 더 누르면 녹음을 끝내고
 그 파일을 ssh로 맥의 cchat-stt(whisper.cpp, 한국어)에 넘겨 받은 글을 claude 입력칸에 넣는다(보내지는 않음).
-상태는 토스트로 알린다. Termux:API 앱과 마이크 권한이 필요하다. 창이 안 떠서 키보드도 다시 올라오지 않는다.
+녹음·변환 중 ⏎를 누르면 녹음을 끝내고 글을 넣은 뒤 바로 보낸다. 상태는 토스트로 알린다. Termux:API 앱과 마이크 권한이 필요하다. 창이 안 떠서 키보드도 다시 올라오지 않는다.
 (폰 음성 인식은 창 없는 쪽(termux-speech-to-text)이 영어로 고정돼 있고, 창 있는 쪽은 닫힐 때 키보드를 올려서 안 쓴다.)
 ssh는 접속을 함께 쓰도록(ControlMaster) 열어 녹음 파일을 보낼 때 다시 로그인하지 않는다.
   키 줄 예: extra-keys = [['ESC','KEYBOARD',{key: 'F12', display: '🎤'},'UP',{macro: 'ALT ENTER', display: '⇧⏎'},'ENTER'],['TAB','ALT','LEFT','DOWN','RIGHT','BKSP']]
@@ -70,11 +70,12 @@ def toast(msg):
 
 
 recording = False
+send_after = False  # 녹음·변환 중 ⏎를 누르면 글을 넣고 바로 보낸다
 
 
 def voice_key():
     """🎤: 녹음 시작 ↔ 끝내고 맥에 보내 글로 바꾸기."""
-    global recording, stt
+    global recording, stt, send_after
     if stt:
         toast("🎤 아직 글로 바꾸는 중"); return
     if not recording:
@@ -84,6 +85,7 @@ def voice_key():
             pass
         run(["termux-microphone-record", "-f", REC, "-l", "600"])
         recording = True
+        send_after = False
         log("🎤 녹음 시작"); toast("🎤 녹음 중 — 다시 누르면 끝")
         return
     recording = False
@@ -119,6 +121,12 @@ try:
             if VOICE in d:
                 d = d.replace(VOICE, b"")
                 voice_key()
+            if d == b"\r" and (recording or stt):  # 녹음·변환 중 ⏎ = 끝내고 바로 보내기(⇧⏎는 \e\r이라 해당 없음)
+                d = b""
+                send_after = True
+                log("⏎: 글이 오면 바로 보냄")
+                if recording:
+                    voice_key()
             k = keep_len(d, VOICE)
             itail, d = (d[-k:], d[:-k]) if k else (b"", d)
             if d:
@@ -133,8 +141,12 @@ try:
                 log(f"글 받음(코드 {rc}): {text!r}")
                 if text:
                     os.write(fd, text.encode())
+                    if send_after:
+                        time.sleep(0.2)  # 글과 ⏎를 한 덩어리로 보내면 붙여넣기로 보고 줄바꿈이 될 수 있어 띄운다
+                        os.write(fd, b"\r")
                 else:
                     toast("🎤 글을 못 받음 — ~/.cache/cchat-termux.log")
+                send_after = False
         if fd in r:
             try:
                 d = os.read(fd, 65536)
