@@ -80,7 +80,7 @@ Instead of the browser, ssh in from a terminal app and attach to tmux directly (
 - **🎤 in any program**: put `[ -z "$CCHAT_VOICE" ] && [ -t 0 ] && cchat-termux --shell && exit` at the top of `~/.bashrc` (Mac address in `~/.config/cchat-termux/host`, ssh key login to the Mac) and it works in Codex, Gemini or any other ssh too.
 - **Key row example** (`~/.termux/termux.properties`): `extra-keys = [[{key: 'F12', display: '🎤'},'KEYBOARD','ALT','UP',{macro: 'ALT ENTER', display: '⇧⏎'},'BKSP'],[{key: 'ENTER', display: '⏎'},'TAB','LEFT','DOWN','RIGHT','ESC']]`. `KEYBOARD` is needed because with tmux mouse mode on, Termux passes screen taps to the program and does not bring the keyboard back.
 - **Colors**: save `cchat-build-index --termux dark` (or `light`) as `~/.termux/colors.properties`. In terminals whose color schemes stop at 16 colors (e.g. Windows Terminal), run `cchat-build-index --osc dark` right before attaching (`--osc reset` restores).
-- **Working mark**: terminals have no page spinner, so it is drawn as a character next to the tab number (one step per 5 s). `cchat-set tab busy play` shows a still green ▶ instead, in the browser too.
+- **Working mark**: terminals have no page spinner, so it is drawn as a character next to the tab number (one step per 5 s). `cchat-set tab busy play` shows a still green ▶ instead.
 
 ## How to use
 
@@ -102,7 +102,7 @@ Tell claude in any cchat tab, e.g. "dark theme on my PC" or "bigger font on my p
 | `cchat-set tab ctx off` | Hide the conversation size (42k) on tabs |
 | `cchat-set tab rows 2` | Tab rows, 1–5. 1 (default) = each tab is two lines tall (number/name); 2 = two-line tabs (number/name) in 2 rows, 3–5 = one-line tabs spread over that many rows (for many tabs); changing rows resets the height to that default |
 | `cchat-set tab height 1.5` | Tab height in multi-row mode (tab rows 2–5). 1 (default) = one text line, 1.5 = one and a half (padding drawn with block characters), 2 = number on top and name below like the default mode. The status bar holds at most 5 lines, so rows × height is capped |
-| `cchat-set tab busy play` | Working mark on busy tabs: `spinner` (default; one step per 5 s in terminals) or a still green ▶, in browser and terminal alike |
+| `cchat-set tab busy play` | Working mark in terminal clients (Termux etc.): `spinner` (default, one step per 5 s) or a still green ▶. The browser always spins |
 | `cchat-set font phone 16` / `font pc off` | Font size per device (`off` = `FONT_SIZE`) |
 | `cchat-set theme pc dark` | Light/dark per device (default: PC light, phone dark) |
 | `cchat-set notify on\|off`, `notify pc\|phone\|telegram\|done\|ask on\|off`, `quiet 01-08` | Notifications (needs a notify hook, see below) |

@@ -260,7 +260,7 @@ def box(style, text, w, rng=None, busy=False):
                 text = clip(lab, w - 1)
     tint = ""
     if busy and not PAD_LINE and SPIN and w - width_of(text) >= 3:
-        text = f"{text} {SPIN}"  # 터미널(Termux·ssh 등)의 스피너, 또는 play 설정의 ▶를 글자로 직접 그린다
+        text = f"{text} {SPIN}"  # 페이지가 아닌 터미널(Termux·ssh 등): 스피너를 글자로 직접 그린다
         if SPIN == "▶":  # 멈춘 ▶는 녹색. 지금 탭은 바탕이 반대 밝기라 대비가 맞는 녹색(colour71)
             tint = f"{text[:-1]}#[fg=colour{CUR_GREEN if style == CUR else DONE_FG}]▶{style}"
     pad = max(0, w - width_of(text))
@@ -272,7 +272,7 @@ def box(style, text, w, rng=None, busy=False):
     return body + PLAIN
 
 
-SPIN = ""  # 이번 스피너 글자(main에서 정함). 빈 값이면 페이지 JS가 그린다
+SPIN = ""  # 페이지가 아닌 클라이언트일 때 이번 스피너 글자(main에서 정함)
 SPIN_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
 
@@ -693,8 +693,7 @@ def main(argv):
         rows = tab_rows()
         global SPIN
         if line == 0 or rows > 1:
-            # play면 페이지·터미널 모두 ▶를 글자로. spinner면 페이지는 JS가 그리고(빈칸 표시만), 터미널은 점자 글자
-            SPIN = "▶" if setting("tab.busy", "spinner") == "play" else "" if is_page(client) \
+            SPIN = "" if is_page(client) else "▶" if setting("tab.busy", "spinner") == "play" \
                 else SPIN_FRAMES[int(time.time()) % len(SPIN_FRAMES)]
         if rows <= 1:
             if line > 1:

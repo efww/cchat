@@ -80,7 +80,7 @@ open "http://127.0.0.1:7681/cchat/?arg=1"
 - **어느 프로그램에서나 🎤**: `~/.bashrc` 맨 위에 `[ -z "$CCHAT_VOICE" ] && [ -t 0 ] && cchat-termux --shell && exit`(맥 주소는 `~/.config/cchat-termux/host`, 맥 ssh 키 로그인 필요) → Codex·Gemini·다른 ssh에서도 된다.
 - **키 줄 예**(`~/.termux/termux.properties`): `extra-keys = [[{key: 'F12', display: '🎤'},'KEYBOARD','ALT','UP',{macro: 'ALT ENTER', display: '⇧⏎'},'BKSP'],[{key: 'ENTER', display: '⏎'},'TAB','LEFT','DOWN','RIGHT','ESC']]`. `KEYBOARD`가 필요한 이유: cchat이 tmux 마우스 모드를 켜 두면 Termux는 화면 탭을 프로그램에 넘기고 키보드를 띄우지 않는다.
 - **색**: `cchat-build-index --termux dark`(또는 `light`) 출력을 `~/.termux/colors.properties`로. 색 설정이 16색까지뿐인 터미널(윈도우 터미널 등)은 attach 직전에 `cchat-build-index --osc dark`(`--osc reset`으로 되돌림).
-- **작업 중 표시**: 터미널에서는 페이지 스피너가 없어 탭 번호 옆 글자로 그린다(5초마다 한 칸). `cchat-set tab busy play`면 움직이지 않는 녹색 ▶(브라우저도 같이).
+- **작업 중 표시**: 터미널에서는 페이지 스피너가 없어 탭 번호 옆 글자로 그린다(5초마다 한 칸). `cchat-set tab busy play`면 움직이지 않는 녹색 ▶.
 
 ## 사용법
 
@@ -102,7 +102,7 @@ cchat 탭 아무 데서나 claude에게 "PC는 다크 테마로", "폰 글자 �
 | `cchat-set tab ctx off` | 탭의 대화 크기(42k) 표시 끄기 |
 | `cchat-set tab rows 2` | 탭 줄 수 1~5. 1(기본)은 탭이 2줄 높이(번호/이름), 2는 두 줄 탭(번호/이름)을 2줄, 3~5는 한 줄짜리 탭을 그 줄 수에 배치(탭이 많을 때). 줄 수를 바꾸면 높이도 그 기본값으로 |
 | `cchat-set tab height 1.5` | 여러 줄 모드(tab rows 2~5)의 탭 높이. 1(기본)은 글자 한 줄, 1.5는 한 줄 반(블록 문자로 칠함), 2는 기본 모드처럼 윗줄 번호·아랫줄 이름표. 상태줄은 최대 5줄이라 줄 수×높이가 넘치면 낮춘다 |
-| `cchat-set tab busy play` | 작업 중 탭 표시: `spinner`(기본, 터미널은 5초마다 한 칸) 또는 움직이지 않는 녹색 ▶. 브라우저·터미널 모두 |
+| `cchat-set tab busy play` | 터미널(Termux 등)로 붙었을 때 작업 중 표시: `spinner`(기본, 5초마다 한 칸) 또는 움직이지 않는 녹색 ▶. 브라우저는 늘 스피너 |
 | `cchat-set font phone 16` / `font pc off` | 기기별 글자 크기(`off` = `FONT_SIZE`) |
 | `cchat-set theme pc dark` | 기기별 라이트/다크(기본 PC 라이트, 폰 다크) |
 | `cchat-set notify on\|off`, `notify pc\|phone\|telegram\|done\|ask on\|off`, `quiet 01-08` | 알림(알림 훅 필요, 아래) |
