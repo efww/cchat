@@ -82,13 +82,17 @@ def dark_extended_ansi() -> list:
 
 
 # 탭 줄 전용 색(cchat-tabs가 colour60~70으로 칠함). 무채색 바탕 위에 옅은 색조 바탕+같은 계열 진한 글자로
-# 상태를 구분한다(완료=초록, 확인 필요=호박색). 작업 중 탭 번호 옆 스피너는 그 탭 글자색.
+# 상태를 구분한다(완료=초록, 확인 필요=호박색). 작업 중 탭 번호 옆 스피너는 SPIN_COLOR.
 TAB_COLORS = {
     "light": {60: "#eceef1", 61: "#3d444d", 62: "#d3f0dc", 63: "#116329", 64: "#fde4c4", 65: "#8a4600",
               66: "#8c959f", 67: "#f6f8fa", 68: "#afb8c1", 69: "#24292f", 70: "#ffffff"},
     "dark": {60: "#272e37", 61: "#c9d1d9", 62: "#173b26", 63: "#6bdc84", 64: "#45300f", 65: "#f2b35c",
              66: "#7d8590", 67: "#161b22", 68: "#545d68", 69: "#e6edf3", 70: "#0d1117"},
 }
+
+
+# 작업 중 스피너 색: 완료 초록(colour63)을 채도만 조금 낮춘 것. [일반 탭 위, 지금 보는 탭 위]
+SPIN_COLOR = {"light": ["#2f6e45", "#8fcfa3"], "dark": ["#7ccb93", "#2f6e45"]}
 
 
 def base_extended_ansi() -> list:
@@ -762,11 +766,10 @@ SCRIPT = """<script id="cchat-script">
           while (e <= b && !(line.getCell(e).getChars() || ' ').trim()) e++;
           while (e <= b && (line.getCell(e).getChars() || ' ').trim()) e++;
           const at = e + 1 <= b ? e + 1 : e;  // 칸이 모자라면 이름 바로 뒤
-          // 기호 색 = 그 탭 번호 글자색(테마 팔레트에서 찾음)
+          // 기호 색 = 완료(초록)를 조금 덜 쨍하게. 지금 보는 탭(바탕 colour69)은 바탕 밝기가 반대라 다른 톤.
           const nc = line.getCell(Math.max(a, e - 1));
-          const pal = theme.extendedAnsi || [], ANSI = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'];
-          const fi = nc && nc.isFgPalette() ? nc.getFgColor() : -1;
-          const color = fi < 0 ? theme.foreground : fi < 8 ? theme[ANSI[fi]] : fi < 16 ? theme['bright' + ANSI[fi - 8][0].toUpperCase() + ANSI[fi - 8].slice(1)] : (pal[fi - 16] || theme.foreground);
+          const onCur = nc && nc.isBgPalette() && nc.getBgColor() === 69;
+          const color = SET.spinColor[dark ? 'dark' : 'light'][onCur ? 1 : 0];
           if (at <= b) spots.push([at, color]);
           x = b + 1;
         } else x++;
@@ -1010,7 +1013,7 @@ def settings() -> dict:
     except OSError:
         snips = []
     return {"fontPc": font_px("font.pc"), "fontPhone": font_px("font.phone"), "snips": snips,
-            "themePc": theme("theme.pc", "light"), "themePhone": theme("theme.phone", "dark")}
+            "themePc": theme("theme.pc", "light"), "themePhone": theme("theme.phone", "dark"), "spinColor": SPIN_COLOR}
 
 
 def main() -> None:
