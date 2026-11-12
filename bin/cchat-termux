@@ -4,7 +4,7 @@
   cchat-termux 사용자@맥주소 --mosh   mosh로 붙기(터치·스크롤 고침 포함)
   cchat-termux --shell                Termux 셸 전체를 감싸 어디서나 🎤(Codex·Gemini·다른 ssh 등). 맥 주소는 ~/.config/cchat-termux/host
                                       ~/.bashrc 맨 위: [ -z "$CCHAT_VOICE" ] && [ -t 0 ] && cchat-termux --shell && exit   (실패하면 그냥 셸)
-  설치(Termux): pkg install -y python termux-api && ssh 사용자@맥주소 cat .local/bin/cchat-termux > $PREFIX/bin/cchat-termux && chmod +x $PREFIX/bin/cchat-termux
+  설치(Termux): pkg install -y openssh python termux-api && ssh 사용자@맥주소 cat .local/bin/cchat-termux > $PREFIX/bin/cchat-termux && chmod +x $PREFIX/bin/cchat-termux
   --shell은 맥 ssh 키 로그인이 필요하다(녹음을 보낼 때 비밀번호를 물을 수 없음): ssh-keygen 후 공개키를 맥 ~/.ssh/authorized_keys에.
 
 음성 입력: Termux 키 줄의 F12(🎤)를 누르면 창 없이 녹음(termux-microphone-record), 한 번 더 누르면 녹음을 끝내고
@@ -12,7 +12,7 @@
 녹음·변환 중 ⏎를 누르면 녹음을 끝내고 글을 넣은 뒤 바로 보낸다. 상태는 토스트로 알린다. Termux:API 앱과 마이크 권한이 필요하다. 창이 안 떠서 키보드도 다시 올라오지 않는다.
 (폰 음성 인식은 창 없는 쪽(termux-speech-to-text)이 영어로 고정돼 있고, 창 있는 쪽은 닫힐 때 키보드를 올려서 안 쓴다.)
 ssh는 접속을 함께 쓰도록(ControlMaster) 열어 녹음 파일을 보낼 때 다시 로그인하지 않는다.
-  키 줄 예: extra-keys = [['ESC','KEYBOARD',{key: 'F12', display: '🎤'},'UP',{macro: 'ALT ENTER', display: '⇧⏎'},'ENTER'],['TAB','ALT','LEFT','DOWN','RIGHT','BKSP']]
+  키 줄 예: extra-keys = [[{key: 'F12', display: '🎤'},'KEYBOARD','ALT','UP',{macro: 'ALT ENTER', display: '⇧⏎'},'BKSP'],[{key: 'ENTER', display: '⏎'},'TAB','LEFT','DOWN','RIGHT','ESC']]
   안 되면 ~/.cache/cchat-termux.log 를 본다(키가 눌렸는지, 인식 결과).
 
 mosh에서 터치가 안 되던 까닭: claude는 마우스 '모든 움직임' 모드(1003)를 켠다. ssh로 보면 tmux가 1000·1002·1003을 차례로 보내
