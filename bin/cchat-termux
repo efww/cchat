@@ -4,22 +4,27 @@
   cchat-termux 사용자@맥주소 --mosh   mosh로 붙기(터치·스크롤 고침 포함)
   설치(Termux): pkg install -y python termux-api && ssh 사용자@맥주소 cat .local/bin/cchat-termux > $PREFIX/bin/cchat-termux && chmod +x $PREFIX/bin/cchat-termux
 
-음성 입력: Termux 키 줄의 F12(🎤) 키를 누르면 키보드를 열지 않고 폰 음성 인식 창(termux-dialog speech, 폰 언어 = 한국어)으로 받아
-그 글을 claude 입력칸에 넣는다(보내지는 않음). Termux:API 앱과 마이크 권한이 필요하다.
-(termux-speech-to-text는 영어(en-US)로 고정돼 있어 쓰지 않는다.)
+음성 입력: Termux 키 줄의 F12(🎤)를 누르면 창 없이 녹음(termux-microphone-record), 한 번 더 누르면 녹음을 끝내고
+그 파일을 ssh로 맥의 cchat-stt(whisper.cpp, 한국어)에 넘겨 받은 글을 claude 입력칸에 넣는다(보내지는 않음).
+상태는 토스트로 알린다. Termux:API 앱과 마이크 권한이 필요하다. 창이 안 떠서 키보드도 다시 올라오지 않는다.
+(폰 음성 인식은 창 없는 쪽(termux-speech-to-text)이 영어로 고정돼 있고, 창 있는 쪽은 닫힐 때 키보드를 올려서 안 쓴다.)
+ssh는 접속을 함께 쓰도록(ControlMaster) 열어 녹음 파일을 보낼 때 다시 로그인하지 않는다.
   키 줄 예: extra-keys = [['ESC','KEYBOARD',{key: 'F12', display: '🎤'},'UP',{macro: 'ALT ENTER', display: '⇧⏎'},'ENTER'],['TAB','ALT','LEFT','DOWN','RIGHT','BKSP']]
   안 되면 ~/.cache/cchat-termux.log 를 본다(키가 눌렸는지, 인식 결과).
 
 mosh에서 터치가 안 되던 까닭: claude는 마우스 '모든 움직임' 모드(1003)를 켠다. ssh로 보면 tmux가 1000·1002·1003을 차례로 보내
 Termux가 1000·1002를 알아듣지만, mosh는 마지막 모드(1003)만 넘기고 Termux는 1003을 모른다 → 1003 켜기 앞에 1002 켜기를 끼운다."""
-import fcntl, json, os, pty, select, signal, subprocess, sys, termios, time, tty
+import fcntl, os, pty, select, signal, subprocess, sys, termios, time, tty
 
 args = [a for a in sys.argv[1:] if not a.startswith("--")]
 if not args or "-h" in sys.argv or "--help" in sys.argv:
     print(__doc__.strip()); sys.exit(2)
 host, mosh = args[0], "--mosh" in sys.argv
 TMUX = ["/opt/homebrew/bin/tmux", "-u", "-L", "cchat", "attach"]  # brew가 /usr/local이면 고친다
-cmd = (["mosh", "--server=/opt/homebrew/bin/mosh-server", host, "--"] + TMUX) if mosh else ["ssh", "-t", host, " ".join(TMUX)]
+SSHO = ["-o", "ControlMaster=auto", "-o", "ControlPath=~/.ssh/cchat-%C", "-o", "ControlPersist=300"]
+cmd = (["mosh", "--server=/opt/homebrew/bin/mosh-server", host, "--"] + TMUX) if mosh else ["ssh", "-t"] + SSHO + [host, " ".join(TMUX)]
+REC = os.path.expanduser("~/.cache/cchat-termux-rec.m4a")
+STT = ".local/bin/cchat-stt"  # 맥 홈 기준(ssh 명령은 홈에서 돈다)
 
 LOG = os.path.expanduser("~/.cache/cchat-termux.log")  # 음성 입력 기록(안 될 때 원인 찾기용)
 
@@ -53,12 +58,52 @@ def keep_len(d, pat):
     return next((k for k in range(len(pat) - 1, 0, -1) if d.endswith(pat[:k])), 0)
 
 
+def run(c):
+    try:
+        subprocess.Popen(c, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError as e:
+        log(f"실행 실패 {c[0]}: {e} (pkg install termux-api, Termux:API 앱 필요)")
+
+
+def toast(msg):
+    run(["termux-toast", "-s", msg])
+
+
+recording = False
+
+
+def voice_key():
+    """🎤: 녹음 시작 ↔ 끝내고 맥에 보내 글로 바꾸기."""
+    global recording, stt
+    if stt:
+        toast("🎤 아직 글로 바꾸는 중"); return
+    if not recording:
+        try:
+            os.remove(REC)
+        except OSError:
+            pass
+        run(["termux-microphone-record", "-f", REC, "-l", "600"])
+        recording = True
+        log("🎤 녹음 시작"); toast("🎤 녹음 중 — 다시 누르면 끝")
+        return
+    recording = False
+    subprocess.run(["termux-microphone-record", "-q"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    log("🎤 녹음 끝, 맥에 보냄"); toast("🎤 글로 바꾸는 중…")
+    # 파일이 다 쓰일 틈을 주고 보낸다. 같이 쓰는 ssh 접속(ControlMaster)을 타므로 다시 로그인하지 않는다.
+    sh = (f'sleep 0.5; [ -s "$1" ] || {{ echo "녹음 파일 없음" >&2; exit 1; }}; '
+          f'exec ssh -o BatchMode=yes {" ".join(SSHO)} "$2" {STT} < "$1"')
+    try:
+        stt = subprocess.Popen(["sh", "-c", sh, "sh", REC, host], stdout=subprocess.PIPE, stderr=open(LOG, "a"))
+    except OSError as e:
+        log(f"보내기 실패: {e}")
+
+
 resize()
 signal.signal(signal.SIGWINCH, resize)
 old = termios.tcgetattr(0)
 tty.setraw(0)
 otail = itail = b""
-stt, heard = None, b""  # 돌고 있는 음성 인식, 받은 글
+stt, heard = None, b""  # 맥에서 글로 바꾸는 중인 ssh, 받은 글
 try:
     while True:
         rl = [0, fd] + ([stt.stdout] if stt else [])
@@ -73,13 +118,7 @@ try:
             d = itail + d
             if VOICE in d:
                 d = d.replace(VOICE, b"")
-                log("🎤 키 눌림" + (" (이미 듣는 중)" if stt else ""))
-                if stt is None:
-                    try:
-                        stt = subprocess.Popen(["termux-dialog", "speech", "-t", "말하세요"], stdout=subprocess.PIPE, stderr=open(LOG, "a"))
-                    except OSError as e:
-                        stt = None
-                        log(f"termux-dialog 실행 실패: {e} (pkg install termux-api, Termux:API 앱 필요)")
+                voice_key()
             k = keep_len(d, VOICE)
             itail, d = (d[-k:], d[:-k]) if k else (b"", d)
             if d:
@@ -88,16 +127,14 @@ try:
             chunk = os.read(stt.stdout.fileno(), 65536)
             if chunk:
                 heard += chunk
-            else:  # 인식 끝
+            else:  # 글로 바꾸기 끝
                 rc = stt.wait(); stt = None
-                raw = heard.decode("utf-8", "replace"); heard = b""
-                try:
-                    text = (json.loads(raw).get("text") or "").strip()
-                except ValueError:
-                    text = ""
-                log(f"인식 끝(코드 {rc}): {raw.strip()!r}")
+                text = heard.decode("utf-8", "replace").strip(); heard = b""
+                log(f"글 받음(코드 {rc}): {text!r}")
                 if text:
                     os.write(fd, text.encode())
+                else:
+                    toast("🎤 글을 못 받음 — ~/.cache/cchat-termux.log")
         if fd in r:
             try:
                 d = os.read(fd, 65536)

@@ -1,0 +1,13 @@
+#!/bin/zsh
+# 음성 → 글(맥에서 whisper.cpp). 폰 Termux의 cchat-termux가 녹음 파일을 ssh로 넘겨 부른다.
+#   cchat-stt < 녹음.m4a      표준 입력의 소리(형식 무관, ffmpeg가 읽음)를 한국어 글로 바꿔 한 줄로 출력
+# 준비: brew install whisper-cpp ffmpeg, 모델 ~/.cache/cchat-whisper/ggml-large-v3-turbo-q5_0.bin
+#   (https://huggingface.co/ggerganov/whisper.cpp 에서 받음). 다른 모델은 CCHAT_STT_MODEL, 언어는 CCHAT_STT_LANG(기본 ko).
+set -u
+M=${CCHAT_STT_MODEL:-@@HOME@@/.cache/cchat-whisper/ggml-large-v3-turbo-q5_0.bin}
+[[ -f $M ]] || { print -u2 "cchat-stt: 모델 없음: $M"; exit 1; }
+d=$(mktemp -d) || exit 1
+trap 'rm -rf $d' EXIT
+cat > $d/in
+@@BREW@@/ffmpeg -nostdin -loglevel error -i $d/in -ar 16000 -ac 1 -c:a pcm_s16le $d/a.wav || exit 1
+@@BREW@@/whisper-cli -m $M -l ${CCHAT_STT_LANG:-ko} -nt -np -f $d/a.wav 2>/dev/null | tr -s ' \n' ' ' | sed 's/^ *//; s/ *$//'
