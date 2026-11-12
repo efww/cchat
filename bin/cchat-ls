@@ -497,7 +497,10 @@ def confirm_kill(scr, r):
 def go(r, client):
     if r["kind"] != "cchat":
         return False
-    tmux("switch-client", "-c", client, "-t", f"={r['name']}:") if client else tmux("switch-client", "-t", f"={r['name']}:")
+    # 팝업이 먼저 닫힌 뒤에 옮긴다(팝업이 떠 있는 채로 옮기면 팝업이 강제로 닫혀 run-shell이 'returned 1'을 띄운다)
+    cmd = TMUX + ["switch-client"] + (["-c", client] if client else []) + ["-t", f"={r['name']}:"]
+    subprocess.Popen(["/bin/sh", "-c", 'sleep 0.15; exec "$@"', "sh"] + cmd, stdin=subprocess.DEVNULL,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
     return True
 
 
