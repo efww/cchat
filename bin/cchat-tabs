@@ -262,7 +262,7 @@ def box(style, text, w, rng=None, busy=False):
 
 
 def is_busy(name, mark, cur):
-    return mark == "busy" and name != cur
+    return mark == "busy"  # 지금 보는 탭도 작업 중이면 스피너
 
 
 _idle = None
