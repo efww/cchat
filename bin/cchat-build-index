@@ -782,7 +782,7 @@ SCRIPT = """<script id="cchat-script">
     for (const [at, color] of spots) {
       const d = document.createElement('div');
       // 점자 글자 대신 점 6개를 직접 그린다: 폰 글꼴은 점자 기호마다 폭이 달라 오른쪽 열만 있는 ⠸가 왼쪽으로 튀었다.
-      const dot = Math.max(3, Math.round(ch * 0.19)), gap = Math.max(1, Math.round(ch * 0.09));
+      const dot = Math.max(2, Math.round(ch * 0.14)), gap = Math.max(1, Math.round(ch * 0.07));
       d.style.cssText = `left:${r.left + at * cw}px;top:${r.top + y * ch}px;width:${cw}px;height:${ch}px;gap:${gap}px;color:${color}`;
       for (let k = 0; k < 6; k++) { const i = document.createElement('i'); i.style.cssText = `width:${dot}px;height:${dot}px`; d.appendChild(i); }
       paintSpin(d, spinFrame());
