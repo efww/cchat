@@ -370,12 +370,12 @@ def status_lines():
 
 
 def row_box(name, unread, cur, w):
-    """여러 줄 모드의 한 줄짜리 탭: ' 번호 ◌ 이름표 … 42k' (◌ = 작업 중 스피너 자리, 브라우저가 그림)."""
+    """여러 줄 모드의 한 줄짜리 탭: ' 번호 이름표 … 42k ◌' (◌ = 맨 오른쪽 칸, 작업 중 스피너 자리. 브라우저가 그림)."""
     lab = label(name)
-    head = lab + "   "
-    room = w - 1 - width_of(head)
+    head = lab + " "
+    room = w - 3 - width_of(head)  # 왼쪽 한 칸 + 오른쪽 스피너 칸과 그 앞 한 칸
     if room < 2:
-        text = clip(lab, max(1, w - 1))
+        text = clip(lab, max(1, w - 3))
     else:
         title, m = tab_label(name), meta(name)
         if m and room >= len(m) + 4:
