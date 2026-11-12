@@ -724,11 +724,21 @@ SCRIPT = """<script id="cchat-script">
   // 뒤따르는 꼬리 두 점이 점점 옅어진다. 한 칸 = SPIN_MS.
   const RING = [0, 3, 4, 5, 2, 1];          // 점1 → 점4 → 점5 → 점6 → 점3 → 점2
   const TAIL = [1, 0.65, 0.35, 0, 0, 0];    // 머리에서 떨어진 거리별 진하기
+  const TAIL_MIX = [0, 0.6, 1, 1, 1, 1];      // 머리 글자색 → 초록으로 섞는 비율
+  const mixHex = (a, b, t) => {
+    const h = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+    const x = h(a), y = h(b);
+    return 'rgb(' + x.map((v, i) => Math.round(v + (y[i] - v) * t)).join(',') + ')';
+  };
   const spinFrame = (now) => Math.floor((now || Date.now()) / SPIN_MS) % RING.length;
   const paintSpin = (d, f) => {
     if (d.dataset.f === String(f)) return;
     d.dataset.f = f;
-    RING.forEach((k, p) => { d.children[k].style.opacity = TAIL[(f - p + RING.length) % RING.length]; });
+    RING.forEach((k, p) => {
+      const dist = (f - p + RING.length) % RING.length, st = d.children[k].style;
+      st.opacity = TAIL[dist];
+      if (TAIL[dist]) st.background = d._cols[dist];
+    });
   };
   const busyLayer = () => {
     let el = document.getElementById('cchat-busy');
@@ -736,7 +746,7 @@ SCRIPT = """<script id="cchat-script">
       const st = document.createElement('style');
       st.textContent = '#cchat-busy{position:fixed;inset:0;pointer-events:none;z-index:5}'
         + '#cchat-busy>div{position:fixed;pointer-events:none;display:grid;grid-template-rows:repeat(3,auto);grid-auto-flow:column;place-content:center}'
-        + '#cchat-busy i{border-radius:50%;background:currentColor;opacity:0}';
+        + '#cchat-busy i{border-radius:50%;opacity:0}';
       document.head.appendChild(st);
       el = document.createElement('div');
       el.id = 'cchat-busy';
@@ -766,11 +776,15 @@ SCRIPT = """<script id="cchat-script">
           while (e <= b && !(line.getCell(e).getChars() || ' ').trim()) e++;
           while (e <= b && (line.getCell(e).getChars() || ' ').trim()) e++;
           const at = e + 1 <= b ? e + 1 : e;  // 칸이 모자라면 이름 바로 뒤
-          // 기호 색 = 완료(초록)를 조금 덜 쨍하게. 지금 보는 탭(바탕 colour69)은 바탕 밝기가 반대라 다른 톤.
+          // 머리 = 그 탭 글자색, 꼬리로 갈수록 차분한 초록(완료색을 채도 낮춘 것)으로 바뀐다.
+          // 지금 보는 탭(바탕 colour69)은 바탕 밝기가 반대라 초록도 다른 톤.
           const nc = line.getCell(Math.max(a, e - 1));
           const onCur = nc && nc.isBgPalette() && nc.getBgColor() === 69;
-          const color = SET.spinColor[dark ? 'dark' : 'light'][onCur ? 1 : 0];
-          if (at <= b) spots.push([at, color]);
+          const pal = theme.extendedAnsi || [];
+          const fi = nc && nc.isFgPalette() ? nc.getFgColor() : -1;
+          const head = fi >= 16 && pal[fi - 16] ? pal[fi - 16] : theme.foreground;
+          const green = SET.spinColor[dark ? 'dark' : 'light'][onCur ? 1 : 0];
+          if (at <= b) spots.push([at, head + '>' + green]);
           x = b + 1;
         } else x++;
       }
@@ -784,11 +798,13 @@ SCRIPT = """<script id="cchat-script">
     el.textContent = '';
     if (!r || !spots.length) return;
     const cw = r.width / cols, ch = r.height / rows;
-    for (const [at, color] of spots) {
+    for (const [at, cc] of spots) {
+      const [head, green] = cc.split('>');
       const d = document.createElement('div');
       // 점자 글자 대신 점 6개를 직접 그린다: 폰 글꼴은 점자 기호마다 폭이 달라 오른쪽 열만 있는 ⠸가 왼쪽으로 튀었다.
       const dot = Math.max(2, +(ch * 0.165).toFixed(1)), gap = Math.max(1, +(ch * 0.075).toFixed(1));  // 반올림하면 작은 차이가 사라져 소수점 px
-      d.style.cssText = `left:${r.left + at * cw}px;top:${r.top + y * ch}px;width:${cw}px;height:${ch}px;gap:${gap}px;color:${color}`;
+      d.style.cssText = `left:${r.left + at * cw}px;top:${r.top + y * ch}px;width:${cw}px;height:${ch}px;gap:${gap}px`;
+      d._cols = TAIL_MIX.map((t) => mixHex(head, green, t));
       for (let k = 0; k < 6; k++) { const i = document.createElement('i'); i.style.cssText = `width:${dot}px;height:${dot}px`; d.appendChild(i); }
       paintSpin(d, spinFrame());
       el.appendChild(d);
