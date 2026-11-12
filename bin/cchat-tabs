@@ -43,6 +43,7 @@ def _c(bg, fg, bold=False):
     return f"#[bg=colour{bg},fg=colour{fg}{',bold' if bold else ''}]"
 CUR = _c(69, 70, True)    # 지금 보는 탭: 진한 먹색(다크는 밝은 탭)
 DONE_FG = 63
+CUR_GREEN = 71  # 지금 탭(CUR) 위에 쓰는 녹색
 DONE = _c(62, DONE_FG, True)   # 답 끝남: 옅은 초록 바탕 + 초록 글자
 ASK = _c(64, 65, True)    # 확인 필요: 옅은 호박색 바탕 + 진한 호박 글자
 OTHER = _c(60, 61)
@@ -260,8 +261,8 @@ def box(style, text, w, rng=None, busy=False):
     tint = ""
     if busy and not PAD_LINE and SPIN and w - width_of(text) >= 3:
         text = f"{text} {SPIN}"  # 페이지가 아닌 터미널(Termux·ssh 등): 스피너를 글자로 직접 그린다
-        if SPIN == "▶":  # 멈춘 ▶는 완료 표시와 같은 녹색
-            tint = f"{text[:-1]}#[fg=colour{DONE_FG}]▶{style}"
+        if SPIN == "▶":  # 멈춘 ▶는 녹색. 지금 탭은 바탕이 반대 밝기라 대비가 맞는 녹색(colour71)
+            tint = f"{text[:-1]}#[fg=colour{CUR_GREEN if style == CUR else DONE_FG}]▶{style}"
     pad = max(0, w - width_of(text))
     left = pad // 2 if not rng or rng.startswith("_") else min(1, pad)  # 탭 이름은 왼쪽 정렬(한 칸 띄움), 화살표는 가운데
     sp = (lambda n: f"#[fg=colour{BUSY_MARK}]{' ' * n}{style}") if busy and not PAD_LINE and not SPIN else (lambda n: " " * n)
