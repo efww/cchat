@@ -417,6 +417,14 @@ def layout():
         b -= 1
 
 
+def two_line():
+    """여러 줄 모드에서 높이가 정확히 2줄로 그려지면 기본 모드처럼 번호/이름표 두 줄 탭으로 쓴다."""
+    if tab_rows() <= 1:
+        return False
+    L, o, b, P, texts = layout()
+    return b == 16 and P == 16 and o == 0
+
+
 def status_lines():
     rows = tab_rows()
     return 2 if rows <= 1 else layout()[0]
@@ -440,13 +448,19 @@ def row_box(name, unread, cur, w):
     return box(style_of(name, unread, cur), text, w, name, is_busy(name, unread, cur))
 
 
-def render_rows(width, cur, tabs, rows, line):
-    """여러 줄 모드: 탭을 앞에서부터 줄마다 같은 개수씩 채운다(칸 폭이 같아 위아래 줄이 맞는다). + 는 마지막 줄 끝."""
+def render_rows(width, cur, tabs, rows, line, part=None):
+    """여러 줄 모드: 탭을 앞에서부터 줄마다 같은 개수씩 채운다(칸 폭이 같아 위아래 줄이 맞는다). + 는 마지막 줄 끝.
+    part = 'num'/'title': 높이 2인 두 줄 탭(기본 모드처럼 윗줄 번호, 아랫줄 이름표·숫자)."""
+    global PAD_LINE
     k = max(1, -(-len(tabs) // rows))  # 한 줄 탭 수
     avail = width - PLUS_W - GAP
     share = max(TAB_W, (avail - GAP * (k - 1)) // k)
     chunk = tabs[line * k:(line + 1) * k]
-    out = (" " * GAP).join(row_box(n, u, cur, share) for n, u in chunk)
+    if part:
+        PAD_LINE = part == "title"
+        out = (" " * GAP).join(box(style_of(n, u, cur), label(n), share, n, is_busy(n, u, cur)) for n, u in chunk)
+    else:
+        out = (" " * GAP).join(row_box(n, u, cur, share) for n, u in chunk)
     if line == rows - 1:
         used = len(chunk) * share + GAP * max(0, len(chunk) - 1)
         out += " " * max(GAP, avail - used + GAP) + plus_box()
@@ -483,6 +497,8 @@ def render_tall(width, cur, tabs, line):
     L, o, b, P, texts = layout()
     if line >= L:
         return ""
+    if two_line():  # 높이 2: 탭마다 윗줄 번호, 아랫줄 이름표
+        return render_rows(width, cur, tabs, rows, line // 2, "title" if line % 2 else "num")
     if line in texts:
         return render_rows(width, cur, tabs, rows, texts.index(line))
     top, bot = 8 * line, 8 * line + 8
@@ -612,7 +628,7 @@ def main(argv):
         else:
             print(render_tall(width, cur, parse(names), line))
     elif argv[:1] == ["lines"]:
-        print(status_lines())
+        print(status_lines(), "two" if tab_rows() <= 1 or two_line() else "one")
     elif argv[:1] == ["apply"]:
         apply_rows()
     elif len(argv) == 3 and argv[0] == "go":

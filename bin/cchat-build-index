@@ -764,8 +764,8 @@ SCRIPT = """<script id="cchat-script">
           let e = a;
           while (e <= b && !(line.getCell(e).getChars() || ' ').trim()) e++;
           while (e <= b && (line.getCell(e).getChars() || ' ').trim()) e++;
-          // 여러 줄 모드(tab rows 2~5)는 탭 맨 오른쪽 칸, 기본 모드는 번호 뒤 한 칸 띄운 자리(칸이 모자라면 바로 뒤)
-          const at = SET.tabRows > 1 ? b : e + 1 <= b ? e + 1 : e;
+          // 한 줄짜리 탭(여러 줄 모드)은 탭 맨 오른쪽 칸, 두 줄 탭(기본 모드·높이 2)은 번호 뒤 한 칸 띄운 자리(칸이 모자라면 바로 뒤)
+          const at = !SET.tabTwoLine ? b : e + 1 <= b ? e + 1 : e;
           // 점 색 = 그 탭 글자색(꼬리는 진하기만 옅어짐)
           const nc = line.getCell(Math.max(a, e - 1));
           const pal = theme.extendedAnsi || [];
@@ -1017,10 +1017,11 @@ def settings() -> dict:
     rows = setting("tab.rows", "1")
     rows = min(5, max(1, int(rows))) if rows.isdigit() else 1
     try:  # 상태줄 줄 수는 탭 높이에 따라 달라져 cchat-tabs가 계산한 값을 쓴다
-        lines = int(subprocess.run(["@@HOME@@/.local/bin/cchat-tabs", "lines"], capture_output=True, text=True, timeout=5).stdout.strip())
-    except (OSError, ValueError, subprocess.SubprocessError):
-        lines = 2 if rows <= 1 else rows
-    return {"statusRows": lines, "tabRows": rows, "fontPc": font_px("font.pc"), "fontPhone": font_px("font.phone"), "snips": snips,
+        out = subprocess.run(["@@HOME@@/.local/bin/cchat-tabs", "lines"], capture_output=True, text=True, timeout=5).stdout.split()
+        lines, two = int(out[0]), out[1:] == ["two"]
+    except (OSError, ValueError, IndexError, subprocess.SubprocessError):
+        lines, two = (2 if rows <= 1 else rows), rows <= 1
+    return {"statusRows": lines, "tabTwoLine": two, "tabRows": rows, "fontPc": font_px("font.pc"), "fontPhone": font_px("font.phone"), "snips": snips,
             "themePc": theme("theme.pc", "light"), "themePhone": theme("theme.phone", "dark")}
 
 
