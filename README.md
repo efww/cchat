@@ -50,7 +50,7 @@ Update: `git pull && ./install.sh -c my.conf`. Uninstall and details: [INSTALL.m
   - Black = the session you are viewing
   - Green = finished replying, not seen yet
   - Orange = waiting for your permission or answer
-  - Faded text = idle for over 1 hour (fainter after 6 hours)
+  - Faded tab = idle for over 1 hour (background blends into the bar, text dimmed)
   - Spinner (⠋⠙⠹…) next to the number = working (all tabs spin in sync). Keeps spinning while background shells or agents run after the reply, then turns green
   - The label row ends with the time a working tab has been busy (`3m`) or the conversation size (`42k` tokens)
   - **+** at the end opens a new session; when tabs overflow, ◀ ▶ show how many hidden tabs need you (`▶2`)
