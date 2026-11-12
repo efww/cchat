@@ -719,7 +719,7 @@ SCRIPT = """<script id="cchat-script">
   // 점 6개(1·2·3 왼쪽 열 위→아래, 4·5·6 오른쪽 열)를 고리로 보고, 머리 점이 시계 방향으로 돌며
   // 뒤따르는 꼬리 두 점이 점점 옅어진다. 한 칸 = SPIN_MS.
   const RING = [0, 3, 4, 5, 2, 1];          // 점1 → 점4 → 점5 → 점6 → 점3 → 점2
-  const TAIL = [1, 0.55, 0.25, 0, 0, 0];    // 머리에서 떨어진 거리별 진하기
+  const TAIL = [1, 0.65, 0.25, 0, 0, 0];    // 머리에서 떨어진 거리별 진하기
   const spinFrame = (now) => Math.floor((now || Date.now()) / SPIN_MS) % RING.length;
   const paintSpin = (d, f) => {
     if (d.dataset.f === String(f)) return;
