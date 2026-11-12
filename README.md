@@ -9,7 +9,7 @@ A browser front-end (desktop and phone) for [Claude Code](https://docs.anthropic
 **Why**
 - **Same screen on phone and PC.** Both open the very same tmux sessions — start on the PC, continue on the phone mid-task.
 - **One tap between jobs.** Sessions are tabs; switching is a single tap or Alt+number.
-- **Status at a glance.** Blinking = working, orange = needs you, green = done. No need to open each session.
+- **Status at a glance.** Spinner next to the tab number = working, orange = needs you, green = done. No need to open each session.
 - **Your real Claude Code.** Runs on your own Mac with your files, tools and settings. Nothing to install on the phone — just a browser.
 
 **Limits**
@@ -51,7 +51,7 @@ Update: `git pull && ./install.sh -c my.conf`. Uninstall and details: [INSTALL.m
   - Green = finished replying, not seen yet
   - Orange = waiting for your permission or answer
   - Faded text = idle for over 1 hour (fainter after 6 hours)
-  - Blinking pale yellow = working (all working tabs blink in sync). Stays blinking while background shells or agents run after the reply, then turns green
+  - Spinner (⠋⠙⠹…) next to the number = working (all tabs spin in sync). Keeps spinning while background shells or agents run after the reply, then turns green
   - The label row ends with the time a working tab has been busy (`3m`) or the conversation size (`42k` tokens)
   - **+** at the end opens a new session; when tabs overflow, ◀ ▶ show how many hidden tabs need you (`▶2`)
 - **Desktop shortcuts**: Alt(Option)+number = go to that session, Alt+←/→ = previous/next, Alt+A = next tab that needs you, Alt+O = overview of all sessions. Shift+Enter = new line (does not send). Ctrl+V pastes your local (browser) clipboard.
@@ -63,7 +63,7 @@ Update: `git pull && ./install.sh -c my.conf`. Uninstall and details: [INSTALL.m
 ## How to use
 
 1. **Open a session**: go to `http://127.0.0.1:7681/cchat/?arg=1`. Each `?arg=name` is its own claude session; a new name creates a new tab.
-2. **Start a task and move on**: type your prompt, press Enter, then switch to another tab with **Alt+number** (or click it). The tab you left blinks pale yellow while claude works.
+2. **Start a task and move on**: type your prompt, press Enter, then switch to another tab with **Alt+number** (or click it). The tab you left shows a spinner next to its number while claude works.
 3. **Watch the colors**: when that tab turns **green**, the answer is ready; **orange** means claude is waiting for your approval or an answer.
 4. **Go back**: click the tab, or use **Alt+←/→**. Opening a tab clears its color. Approve in the orange tab and claude continues.
 5. **Close the browser any time**: sessions keep running in tmux. Open the page again and everything is where you left it. Type `/exit` in a session to close its tab.
@@ -72,18 +72,17 @@ On a phone, tap a tab to switch; drag with your finger to scroll, and use the ke
 
 ## Settings: just ask
 
-Tell claude in any cchat tab, e.g. "make the blink faster" or "bigger font on my phone". It uses `cchat-set` (run it yourself if you prefer):
+Tell claude in any cchat tab, e.g. "dark theme on my PC" or "bigger font on my phone". It uses `cchat-set` (run it yourself if you prefer):
 
 | Command | Effect |
 |---|---|
 | `cchat-set` | Show current settings |
-| `cchat-set blink 0.8` | Blink period of working tabs, in seconds |
 | `cchat-set tab ctx off` | Hide the conversation size (42k) on tabs |
 | `cchat-set font phone 16` / `font pc off` | Font size per device (`off` = `FONT_SIZE`) |
 | `cchat-set theme pc dark` | Light/dark per device (default: PC light, phone dark) |
 | `cchat-set notify on\|off`, `notify pc\|phone\|telegram\|done\|ask on\|off`, `quiet 01-08` | Notifications (needs a notify hook, see below) |
 
-Blink, font and theme apply after a browser reload. Notifications: if `~/.config/cchat/notify` exists and is executable, cchat runs it as `notify <session> <done|ask|test>` (with `CCHAT_NOTIFY_DEVICES`) whenever a tab you are not looking at turns green or orange. cchat does not ship a push server; the hook can send to anything (web push, ntfy, Telegram…). Ready-made: `cp examples/notify-ntfy ~/.config/cchat/notify` (edit `TOPIC` inside), then `cchat-set notify test`.
+Font and theme apply after a browser reload. Notifications: if `~/.config/cchat/notify` exists and is executable, cchat runs it as `notify <session> <done|ask|test>` (with `CCHAT_NOTIFY_DEVICES`) whenever a tab you are not looking at turns green or orange. cchat does not ship a push server; the hook can send to anything (web push, ntfy, Telegram…). Ready-made: `cp examples/notify-ntfy ~/.config/cchat/notify` (edit `TOPIC` inside), then `cchat-set notify test`.
 
 ## Remote access (read this)
 
@@ -97,7 +96,7 @@ ttyd listens on 127.0.0.1 only and has **no authentication of its own**. To use 
 | `bin/cchat-session` | Run by ttyd for each connection. Attaches to a tmux session and runs claude in a loop inside it |
 | `bin/cchat-tabs` | Draws the session tabs in the status line; handles clicks and shortcuts |
 | `bin/cchat-unread` | Called by claude hooks (done, permission, started work) to color the tabs |
-| `bin/cchat-build-index` | Builds `index.html` from ttyd's default page plus the cchat parts (themes, phone key bar and scrolling, shortcuts, blinking) |
+| `bin/cchat-build-index` | Builds `index.html` from ttyd's default page plus the cchat parts (themes, phone key bar and scrolling, shortcuts, working spinner) |
 | `bin/cchat-set` | View and change settings (`~/.config/cchat/settings`) |
 | `bin/cchat-send` · `bin/cchat-history` · `bin/cchat-snip` | Pass an answer between tabs · reopen closed conversations · saved prompts |
 | `bin/cchat-ttyd` | Starts ttyd (rebuilds the page after a ttyd upgrade; `KEEP_AWAKE=1` keeps the Mac awake) |

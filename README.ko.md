@@ -9,7 +9,7 @@ Claude Code를 브라우저(PC·폰)에서 쓰는 웹 터미널. 맥 한 대에�
 **장점**
 - **폰과 PC가 같은 화면.** 둘 다 같은 tmux 대화를 연다. PC에서 하던 걸 폰에서 그대로 이어서 한다.
 - **작업 이동이 탭 한 번.** 대화가 탭이라 폰은 한 번 누르면, PC는 Alt+숫자로 넘어간다.
-- **진행 상황이 한눈에.** 깜빡임 = 작업 중, 주황 = 내 차례, 녹색 = 끝남. 하나씩 열어 볼 필요가 없다.
+- **진행 상황이 한눈에.** 번호 옆 ⠹ 스피너 = 작업 중, 주황 = 내 차례, 녹색 = 끝남. 하나씩 열어 볼 필요가 없다.
 - **내 맥의 진짜 Claude Code.** 내 파일·도구·설정 그대로. 폰엔 설치할 것 없이 브라우저만.
 
 **한계**
@@ -51,7 +51,7 @@ open "http://127.0.0.1:7681/cchat/?arg=1"
   - 녹색 = 답이 끝났는데 아직 안 본 대화
   - 주황 = 허락·질문을 기다리는 대화
   - 흐린 글자 = 1시간 넘게 일 안 한 대화(6시간 넘으면 더 흐리게)
-  - 연노랑 깜빡임 = 작업 중(여러 탭이 같은 박자로). 답이 끝나도 백그라운드 셸·에이전트가 돌면 계속 깜빡이고, 다 끝나면 녹색
+  - 번호 옆 도는 기호(⠋⠙⠹…) = 작업 중(모든 탭이 같은 박자로). 답이 끝나도 백그라운드 셸·에이전트가 돌면 계속 돌고, 다 끝나면 녹색
   - 이름표 줄 끝 숫자: 작업 중이면 걸린 시간(`3m`), 끝나면 대화 크기(`42k` 토큰)
   - 끝의 **+** 는 새 대화. 탭이 넘치면 ◀ ▶에 숨은 확인할 탭 수(`▶2`)
 - **PC 단축키**: Alt(Option)+숫자 = 그 번호 대화, Alt+←/→ = 이전/다음, Alt+A = 확인할 다음 탭, Alt+O = 전체 모아보기. Shift+Enter = 줄바꿈(보내지 않음). Ctrl+V는 PC 클립보드를 붙인다.
@@ -63,7 +63,7 @@ open "http://127.0.0.1:7681/cchat/?arg=1"
 ## 사용법
 
 1. **대화 열기**: `http://127.0.0.1:7681/cchat/?arg=1`로 접속한다. `?arg=이름`마다 따로인 claude 대화이고, 새 이름이면 탭이 새로 생긴다.
-2. **일 시키고 다른 탭으로**: 할 일을 입력하고 Enter, 그다음 **Alt+숫자**(또는 클릭)로 다른 탭으로 간다. 떠난 탭은 claude가 일하는 동안 연노랑으로 깜빡인다.
+2. **일 시키고 다른 탭으로**: 할 일을 입력하고 Enter, 그다음 **Alt+숫자**(또는 클릭)로 다른 탭으로 간다. 떠난 탭은 claude가 일하는 동안 번호 옆에 스피너가 돈다.
 3. **색 보기**: 그 탭이 **녹색**이 되면 답이 나온 것, **주황**이면 허락이나 대답을 기다리는 것.
 4. **돌아가기**: 탭을 클릭하거나 **Alt+←/→**. 탭을 열면 색이 지워진다. 주황 탭에서 허락하면 claude가 이어서 한다.
 5. **브라우저는 아무 때나 닫아도 된다**: 대화는 tmux에서 계속 돈다. 다시 열면 그대로 있다. 대화에서 `/exit`를 치면 그 탭이 닫힌다.
@@ -72,18 +72,17 @@ open "http://127.0.0.1:7681/cchat/?arg=1"
 
 ## 설정: 말로 시키면 됨
 
-cchat 탭 아무 데서나 claude에게 "깜빡임 좀 빠르게", "폰 글자 크게"라고 하면 됩니다. claude가 `cchat-set`을 씁니다(직접 쳐도 됨):
+cchat 탭 아무 데서나 claude에게 "PC는 다크 테마로", "폰 글자 크게"라고 하면 됩니다. claude가 `cchat-set`을 씁니다(직접 쳐도 됨):
 
 | 명령 | 하는 일 |
 |---|---|
 | `cchat-set` | 지금 설정 보기 |
-| `cchat-set blink 0.8` | 작업 중 탭 깜빡임 박자(초) |
 | `cchat-set tab ctx off` | 탭의 대화 크기(42k) 표시 끄기 |
 | `cchat-set font phone 16` / `font pc off` | 기기별 글자 크기(`off` = `FONT_SIZE`) |
 | `cchat-set theme pc dark` | 기기별 라이트/다크(기본 PC 라이트, 폰 다크) |
 | `cchat-set notify on\|off`, `notify pc\|phone\|telegram\|done\|ask on\|off`, `quiet 01-08` | 알림(알림 훅 필요, 아래) |
 
-깜빡임·글자 크기·테마는 브라우저 새로고침 뒤 적용됩니다. 알림: `~/.config/cchat/notify`가 실행 파일로 있으면, 보고 있지 않은 탭이 녹색·주황이 될 때 `notify <세션> <done|ask|test>`로 부릅니다(`CCHAT_NOTIFY_DEVICES` 함께). 푸시 서버는 들어 있지 않고, 훅에서 웹 푸시·ntfy·텔레그램 등 원하는 곳으로 보내면 됩니다. 바로 쓰기: `cp examples/notify-ntfy ~/.config/cchat/notify`(안의 `TOPIC` 수정) 후 `cchat-set notify test`.
+글자 크기·테마는 브라우저 새로고침 뒤 적용됩니다. 알림: `~/.config/cchat/notify`가 실행 파일로 있으면, 보고 있지 않은 탭이 녹색·주황이 될 때 `notify <세션> <done|ask|test>`로 부릅니다(`CCHAT_NOTIFY_DEVICES` 함께). 푸시 서버는 들어 있지 않고, 훅에서 웹 푸시·ntfy·텔레그램 등 원하는 곳으로 보내면 됩니다. 바로 쓰기: `cp examples/notify-ntfy ~/.config/cchat/notify`(안의 `TOPIC` 수정) 후 `cchat-set notify test`.
 
 ## 밖에서 접속할 때 (주의)
 
@@ -97,7 +96,7 @@ ttyd는 127.0.0.1에만 열리고 **자체 인증이 없다**. 밖에서 쓰려�
 | `bin/cchat-session` | ttyd가 접속마다 실행. tmux 대화에 붙고, 안에서 claude를 반복 실행 |
 | `bin/cchat-tabs` | 상태줄 대화 탭 그리기, 클릭·단축키 전환 |
 | `bin/cchat-unread` | claude 훅(완료·허락·작업 시작)에서 탭 색 표시 |
-| `bin/cchat-build-index` | ttyd 기본 화면에 cchat 부분(테마, 폰 키 바·스크롤, 단축키, 깜빡임)을 넣어 `index.html` 생성 |
+| `bin/cchat-build-index` | ttyd 기본 화면에 cchat 부분(테마, 폰 키 바·스크롤, 단축키, 작업 중 스피너)을 넣어 `index.html` 생성 |
 | `bin/cchat-set` | 설정 보기·바꾸기(`~/.config/cchat/settings`) |
 | `bin/cchat-send` · `bin/cchat-history` · `bin/cchat-snip` | 탭 사이 답 넘기기 · 닫은 대화 다시 열기 · 지시문 저장 |
 | `bin/cchat-ttyd` | ttyd 시작(ttyd 업그레이드 뒤 페이지 다시 만들기, `KEEP_AWAKE=1`이면 맥 잠자기 막기) |

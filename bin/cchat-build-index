@@ -82,14 +82,14 @@ def dark_extended_ansi() -> list:
 
 
 # 탭 줄 전용 색(cchat-tabs가 colour60~70으로 칠함). 무채색 바탕 위에 옅은 색조 바탕+같은 계열 진한 글자로
-# 상태를 구분한다(완료=초록, 확인 필요=호박색). 작업 중 깜빡임 색은 BUSY_TINT.
+# 상태를 구분한다(완료=초록, 확인 필요=호박색). 작업 중 탭 번호 옆 스피너 색은 SPIN_COLOR.
 TAB_COLORS = {
     "light": {60: "#eceef1", 61: "#3d444d", 62: "#d3f0dc", 63: "#116329", 64: "#fde4c4", 65: "#8a4600",
               66: "#8c959f", 67: "#f6f8fa", 68: "#afb8c1", 69: "#24292f", 70: "#ffffff"},
     "dark": {60: "#272e37", 61: "#c9d1d9", 62: "#173b26", 63: "#6bdc84", 64: "#45300f", 65: "#f2b35c",
              66: "#7d8590", 67: "#161b22", 68: "#545d68", 69: "#e6edf3", 70: "#0d1117"},
 }
-BUSY_TINT = {"light": "rgba(255,236,130,.55)", "dark": "rgba(255,228,120,.30)"}
+SPIN_COLOR = {"light": "#9a6700", "dark": "#e3b341"}
 
 
 def base_extended_ansi() -> list:
@@ -711,18 +711,18 @@ SCRIPT = """<script id="cchat-script">
     }, true);
   }
 
-  // 작업 중 탭 깜빡임: cchat-tabs가 작업 중 탭의 빈칸 글자색을 BUSY_MARK(256색 123번)로 칠해 둔다(빈칸이라 안 보임).
-  // 1초마다 맨 아래 2줄(상태줄)만 읽어 그 탭의 칸 범위를 찾고, 그 위에 반투명 판을 얹어 cchat-set blink 박자(기본 0.8초)마다 판을 담은 층 전체의 진하기를 딱 바꾼다(모든 탭 같은 박자).
-  // 터미널 색·글자 그림은 건드리지 않고(다시 그리기 없음), 판은 입력을 통과시킨다(pointer-events:none).
-  const BUSY_MARK = 123, BUSY_CYCLE = SET.blinkMs;
+  // 작업 중 탭 스피너: cchat-tabs가 작업 중 탭의 빈칸 글자색을 BUSY_MARK(256색 123번)로 칠해 둔다(빈칸이라 안 보임).
+  // 1초마다 탭 위 줄(번호 줄)을 읽어 그 탭의 번호 바로 뒤 빈칸을 찾고, 그 자리에 도는 점자 기호(⠋⠙⠹…)를 얹는다.
+  // 터미널 글자는 건드리지 않고(다시 그리기 없음), 기호는 입력을 통과시킨다(pointer-events:none).
+  // 모든 탭의 기호는 시계 기준으로 같은 모양을 보여 같이 돈다.
+  const BUSY_MARK = 123, SPIN = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏', SPIN_MS = 90;
   let busyKey = '';
   const busyLayer = () => {
     let el = document.getElementById('cchat-busy');
     if (!el) {
       const st = document.createElement('style');
       st.textContent = '#cchat-busy{position:fixed;inset:0;pointer-events:none;z-index:5}'
-        + '#cchat-busy div{position:fixed;pointer-events:none;background:' + (dark ? SET.busyTint.dark : SET.busyTint.light)
-        + '}';
+        + '#cchat-busy div{position:fixed;pointer-events:none;display:flex;align-items:center;justify-content:center;font-weight:700;color:' + SET.spinColor[dark ? 'dark' : 'light'] + '}';
       document.head.appendChild(st);
       el = document.createElement('div');
       el.id = 'cchat-busy';
@@ -734,10 +734,10 @@ SCRIPT = """<script id="cchat-script">
     const term = window.term;
     if (!term || !term.buffer || document.hidden) return;
     const buf = term.buffer.active, rows = term.rows, cols = term.cols;
-    const spans = [];
-    for (const y of [rows - 2, rows - 1]) {
-      const line = buf.getLine(buf.viewportY + y);
-      if (!line) continue;
+    const spots = [];
+    const y = rows - 2;  // 탭 위 줄(번호)
+    const line = buf.getLine(buf.viewportY + y);
+    if (line) {
       let x = 0;
       while (x < cols) {
         const c = line.getCell(x);
@@ -747,33 +747,40 @@ SCRIPT = """<script id="cchat-script">
           let a = x, b = x;
           while (a > 0) { const p = line.getCell(a - 1); if (!p || p.getBgColor() !== bg || p.isBgDefault()) break; a--; }
           while (b < cols - 1) { const n = line.getCell(b + 1); if (!n || n.getBgColor() !== bg || n.isBgDefault()) break; b++; }
-          spans.push([y, a, b]);
+          // 번호 끝 다음 칸을 한 칸 띄우고 기호 자리로
+          let e = a;
+          while (e <= b && !(line.getCell(e).getChars() || ' ').trim()) e++;
+          while (e <= b && (line.getCell(e).getChars() || ' ').trim()) e++;
+          const at = e + 1;
+          if (at <= b) spots.push(at);
           x = b + 1;
         } else x++;
       }
     }
     const scr = term.element && term.element.querySelector('.xterm-screen');
     const r = scr ? scr.getBoundingClientRect() : null;
-    const key = r ? `${spans.join('|')}@${r.left},${r.top},${r.width},${r.height},${cols},${rows}` : '';
+    const key = r ? `${spots.join('|')}@${r.left},${r.top},${r.width},${r.height},${cols},${rows}` : '';
     if (key === busyKey) return;
     busyKey = key;
     const el = busyLayer();
     el.textContent = '';
-    if (!r || !spans.length) return;
+    if (!r || !spots.length) return;
     const cw = r.width / cols, ch = r.height / rows;
-    for (const [y, a, b] of spans) {
+    const fs = (term.options && term.options.fontSize) || 13;
+    for (const at of spots) {
       const d = document.createElement('div');
-      d.style.cssText = `left:${r.left + a * cw}px;top:${r.top + y * ch}px;width:${(b - a + 1) * cw}px;height:${ch}px`;
+      d.style.cssText = `left:${r.left + at * cw}px;top:${r.top + y * ch}px;width:${cw}px;height:${ch}px;font-size:${Math.round(fs * 1.3)}px`;
+      d.textContent = SPIN[Math.floor(Date.now() / SPIN_MS) % SPIN.length];
       el.appendChild(d);
     }
   };
   setInterval(scanBusy, 1000);
-  // 깜빡임은 판 하나하나가 아니라 판을 담은 층 전체를 한 번에 켜고 끈다 → 여러 탭이 언제 시작했든 항상 같은 박자.
-  // 박자는 시계 기준(blink초 평소, blink초 짙게)이라 판을 새로 그려도 어긋나지 않는다.
   setInterval(() => {
     const el = document.getElementById('cchat-busy');
-    if (el) el.style.opacity = Math.floor(Date.now() / (BUSY_CYCLE / 2)) % 2 ? '1' : '0';
-  }, 100);
+    if (!el || !el.firstChild || document.hidden) return;
+    const ch = SPIN[Math.floor(Date.now() / SPIN_MS) % SPIN.length];
+    for (const d of el.children) d.textContent = ch;
+  }, SPIN_MS);
 
   // 웹 푸시 알림(PC·안드로이드 Chrome): 원격 중계가 ./sw.js와 ./push/key를 내줄 때만 켜진다(이 맥 주소로 바로 열면 404라 아무것도 안 함).
   // 허락 전이면 오른쪽 위에 '알림 켜기' 버튼을 띄우고(× 로 숨김), 허락돼 있으면 열 때마다 구독을 중계에 다시 알린다.
@@ -894,11 +901,11 @@ SCRIPT = """<script id="cchat-script">
     const ko = /^ko/i.test(navigator.language || '');
     const lines = ko
       ? (mobile
-        ? ['아래 줄이 대화 탭 — 누르면 바뀜, + 는 새 대화', '깜빡임 = 작업 중 · 주황 = 확인 필요 · 녹색 = 끝남', '손가락으로 끌면 스크롤, 맨 아래 키 바로 Esc·Tab·방향키', '설정은 claude에게 말로 (예: "폰 글자 크게")']
-        : ['아래 줄이 대화 탭 — 클릭 또는 Alt+숫자, Alt+←/→', '+ 는 새 대화 (또는 주소에 ?arg=이름)', '깜빡임 = 작업 중 · 주황 = 확인 필요 · 녹색 = 끝남', '설정은 claude에게 말로 (예: "깜빡임 빠르게")'])
+        ? ['아래 줄이 대화 탭 — 누르면 바뀜, + 는 새 대화', '⠹ = 작업 중 · 주황 = 확인 필요 · 녹색 = 끝남', '손가락으로 끌면 스크롤, 맨 아래 키 바로 Esc·Tab·방향키', '설정은 claude에게 말로 (예: "폰 글자 크게")']
+        : ['아래 줄이 대화 탭 — 클릭 또는 Alt+숫자, Alt+←/→', '+ 는 새 대화 (또는 주소에 ?arg=이름)', '⠹ = 작업 중 · 주황 = 확인 필요 · 녹색 = 끝남', '설정은 claude에게 말로 (예: "PC는 다크 테마로")'])
       : (mobile
-        ? ['Bottom rows are session tabs — tap to switch, + opens a new one', 'Blinking = working · orange = needs you · green = done', 'Drag to scroll; the key bar has Esc, Tab and arrows', 'Change settings by asking claude (e.g. "bigger font on my phone")']
-        : ['Bottom rows are session tabs — click, or Alt+number, Alt+←/→', '+ opens a new session (or ?arg=name in the URL)', 'Blinking = working · orange = needs you · green = done', 'Change settings by asking claude (e.g. "faster blink")']);
+        ? ['Bottom rows are session tabs — tap to switch, + opens a new one', '⠹ = working · orange = needs you · green = done', 'Drag to scroll; the key bar has Esc, Tab and arrows', 'Change settings by asking claude (e.g. "bigger font on my phone")']
+        : ['Bottom rows are session tabs — click, or Alt+number, Alt+←/→', '+ opens a new session (or ?arg=name in the URL)', '⠹ = working · orange = needs you · green = done', 'Change settings by asking claude (e.g. "dark theme on PC")']);
     const card = document.createElement('div');
     card.id = 'cchat-hint';
     card.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:25;max-width:min(440px,calc(100vw - 24px));'
@@ -973,18 +980,14 @@ def fetch_base_index() -> str:
 
 
 def settings() -> dict:
-    """cchat-set 값 중 페이지가 쓰는 것: 깜빡임 한 주기(ms, 평소+짙게), 기기별 글자 크기(0=ttyd 기본), 기기별 테마."""
-    try:
-        blink = min(5.0, max(0.5, float(setting("blink", "0.8"))))
-    except ValueError:
-        blink = 0.8
+    """cchat-set 값 중 페이지가 쓰는 것: 기기별 글자 크기(0=ttyd 기본), 기기별 테마, 저장한 지시문."""
     theme = lambda k, d: setting(k, d) if setting(k, d) in ("light", "dark") else d
     try:
         snips = [l.strip() for l in SNIPS.read_text(encoding="utf-8").splitlines() if l.strip()][:30]
     except OSError:
         snips = []
-    return {"blinkMs": int(blink * 2000), "fontPc": font_px("font.pc"), "fontPhone": font_px("font.phone"), "snips": snips,
-            "themePc": theme("theme.pc", "light"), "themePhone": theme("theme.phone", "dark"), "busyTint": BUSY_TINT}
+    return {"fontPc": font_px("font.pc"), "fontPhone": font_px("font.phone"), "snips": snips,
+            "themePc": theme("theme.pc", "light"), "themePhone": theme("theme.phone", "dark"), "spinColor": SPIN_COLOR}
 
 
 def main() -> None:
