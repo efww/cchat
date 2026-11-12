@@ -54,7 +54,7 @@ Update: `git pull && ./install.sh -c my.conf`. Uninstall and details: [INSTALL.m
   - Spinner (⠋⠙⠹…) next to the number = working (all tabs spin in sync). Keeps spinning while background shells or agents run after the reply, then turns green
   - The label row ends with the time a working tab has been busy (`3m`) or the conversation size (`42k` tokens)
   - **+** at the end opens a new session; when tabs overflow, ◀ ▶ show how many hidden tabs need you (`▶2`)
-- **Desktop shortcuts**: Alt(Option)+number = go to that session, Alt+←/→ = previous/next, Alt+A = next tab that needs you, Alt+O = overview of all sessions. Shift+Enter = new line (does not send). Ctrl+V pastes your local (browser) clipboard.
+- **Desktop shortcuts**: Alt(Option)+number = go to that session, Alt+←/→ = previous/next, Alt+↑/↓ = tab above/below (multi-row tabs), Alt+A = next tab that needs you, Alt+O = overview of all sessions. Shift+Enter = new line (does not send). Ctrl+V pastes your local (browser) clipboard.
 - **Phone**: finger-drag scrolling, swipe left/right to change tabs, tap a URL to open it (wrapped URLs too), dark theme. Key bar: ★ = next tab that needs you, Esc, Tab, arrows, ⋯ = overview, voice input, saved prompts (✎), photo/file upload (📎, remote relay only).
 - **Approve with one tap**: when claude shows a numbered choice (permission, question), the numbers appear as buttons.
 - **Helpers you can ask claude to use**: `cchat-send 1 2` (pass tab 1's last answer to tab 2's input), `cchat-history` (find and reopen closed conversations), `cchat-snip` (saved prompts), `cchat-label` (tab names), `cchat-set` (settings).

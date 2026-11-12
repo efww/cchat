@@ -12,8 +12,8 @@
       탭 폭보다 길면 앞에서부터 들어가는 만큼 넣고 탭 마지막 칸을 …로 끝낸다(한글은 두 칸으로 센다).
   cchat-tabs click <client> <_prev|_next>
       ◀ ▶ 클릭 처리(MouseDown1Status 바인딩).
-  cchat-tabs go <client> <prev|next|attention|번호>
-      PC 단축키(Alt+←/→, Alt+숫자, Alt+A): 탭 순서로 이전/다음 대화(끝에서 돌아감), 그 번호 대화(0=main),
+  cchat-tabs go <client> <prev|next|up|down|attention|번호>
+      PC 단축키(Alt+←/→, Alt+↑/↓, Alt+숫자, Alt+A): 탭 순서로 이전/다음 대화(끝에서 돌아감), 여러 줄 모드에서 보이는 위/아래 칸, 그 번호 대화(0=main),
       attention = 확인할 대화(주황 먼저, 없으면 녹색). 폰 키 바의 ★도 Alt+A를 보낸다.
   cchat-tabs apply
       cchat-set tab rows N 값에 맞춰 tmux 상태줄 줄 수를 바꾼다(1 → 2줄 높이 탭, 2~5 → 한 줄짜리 탭을 N줄에 배치).
@@ -558,8 +558,9 @@ def new(client):
 def click(client, which):
     if which == "_new":
         return new(client)
-    width = int(tmux("display", "-p", "-c", client, "#{client_width}") or 80) - PLUS_W - GAP
-    cur = tmux("display", "-p", "-c", client, "#{client_session}")
+    w = next((l.split("\t")[1] for l in tmux("list-clients", "-F", "#{client_name}\t#{client_width}").splitlines() if l.split("\t")[0] == client), "")
+    width = int(w or 80) - PLUS_W - GAP
+    cur = client_session(client)
     tabs = parse(tmux("list-sessions", "-F", "#{session_name}"))
     if fit_all(tabs, width) is not None:
         return
@@ -580,8 +581,17 @@ def click(client, which):
     tmux("refresh-client", "-t", client, "-S")
 
 
+def client_session(client):
+    """그 클라이언트가 보고 있는 대화. display -c는 형식을 '가장 최근 클라이언트' 기준으로 풀어서 쓰지 않는다."""
+    for line in tmux("list-clients", "-F", "#{client_name}\t#{client_session}").splitlines():
+        n, _, sess = line.partition("\t")
+        if n == client:
+            return sess
+    return ""
+
+
 def go(client, which):
-    cur = tmux("display", "-p", "-c", client, "#{client_session}")
+    cur = client_session(client)
     names = [n for n, _ in parse(tmux("list-sessions", "-F", "#{session_name}"))]
     if not names:
         return
@@ -595,6 +605,21 @@ def go(client, which):
         if target is None:
             tmux("display-message", "-c", client, "확인할 대화가 없습니다")
             return
+    elif which in ("up", "down"):
+        # 여러 줄 모드: 화면에 보이는 위/아래 칸(render_rows와 같은 배치: 한 줄에 k개씩). 아래 줄이 짧으면 그 줄 마지막 탭.
+        rows = tab_rows()
+        if rows <= 1 or cur not in names:
+            return
+        k = max(1, -(-len(names) // rows))
+        i = names.index(cur)
+        j = i - k if which == "up" else i + k
+        if j < 0:
+            return
+        if j >= len(names):
+            if (i // k + 1) * k >= len(names):  # 아래 줄이 없다
+                return
+            j = len(names) - 1
+        target = names[j]
     elif which in ("prev", "next"):
         i = names.index(cur) if cur in names else 0
         target = names[(i + (1 if which == "next" else -1)) % len(names)]
