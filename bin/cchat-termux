@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+"""Termux(안드)에서 cchat에 붙는다. 폰 Termux에 복사해서 쓰는 스크립트(맥에서는 안 씀).
+  cchat-termux 사용자@맥주소          ssh로 붙기
+  cchat-termux 사용자@맥주소 --mosh   mosh로 붙기(터치·스크롤 고침 포함)
+  설치(Termux): pkg install -y python termux-api && ssh 사용자@맥주소 cat .local/bin/cchat-termux > $PREFIX/bin/cchat-termux && chmod +x $PREFIX/bin/cchat-termux
+
+음성 입력: Termux 키 줄의 F12(🎤) 키를 누르면 키보드를 열지 않고 폰 음성 인식(termux-speech-to-text)으로 받아
+그 글을 claude 입력칸에 넣는다(보내지는 않음). Termux:API 앱과 마이크 권한이 필요하다.
+  키 줄 예: extra-keys = [['ESC','KEYBOARD',{key: 'F12', display: '🎤'},'UP'],['TAB','ALT','LEFT','DOWN','RIGHT',{macro: 'ALT ENTER', display: '⇧⏎'}]]
+
+mosh에서 터치가 안 되던 까닭: claude는 마우스 '모든 움직임' 모드(1003)를 켠다. ssh로 보면 tmux가 1000·1002·1003을 차례로 보내
+Termux가 1000·1002를 알아듣지만, mosh는 마지막 모드(1003)만 넘기고 Termux는 1003을 모른다 → 1003 켜기 앞에 1002 켜기를 끼운다."""
+import fcntl, os, pty, select, signal, subprocess, sys, termios, tty
+
+args = [a for a in sys.argv[1:] if not a.startswith("--")]
+if not args or "-h" in sys.argv or "--help" in sys.argv:
+    print(__doc__.strip()); sys.exit(2)
+host, mosh = args[0], "--mosh" in sys.argv
+TMUX = ["/opt/homebrew/bin/tmux", "-u", "-L", "cchat", "attach"]  # brew가 /usr/local이면 고친다
+cmd = (["mosh", "--server=/opt/homebrew/bin/mosh-server", host, "--"] + TMUX) if mosh else ["ssh", "-t", host, " ".join(TMUX)]
+
+ON, FIX = b"\x1b[?1003h", b"\x1b[?1002h\x1b[?1003h"
+VOICE = b"\x1b[24~"  # F12
+pid, fd = pty.fork()
+if pid == 0:
+    os.execvp(cmd[0], cmd)
+
+
+def resize(*_):
+    try:
+        fcntl.ioctl(fd, termios.TIOCSWINSZ, fcntl.ioctl(0, termios.TIOCGWINSZ, b"\0" * 8))
+        os.kill(pid, signal.SIGWINCH)
+    except OSError:
+        pass
+
+
+def keep_len(d, pat):
+    """d 끝이 pat의 앞부분이면 그 길이(다음 조각과 이어 봐야 함)."""
+    return next((k for k in range(len(pat) - 1, 0, -1) if d.endswith(pat[:k])), 0)
+
+
+resize()
+signal.signal(signal.SIGWINCH, resize)
+old = termios.tcgetattr(0)
+tty.setraw(0)
+otail = itail = b""
+stt, heard = None, b""  # 돌고 있는 음성 인식, 받은 글
+try:
+    while True:
+        rl = [0, fd] + ([stt.stdout] if stt else [])
+        try:
+            r, _, _ = select.select(rl, [], [])
+        except InterruptedError:
+            continue
+        if 0 in r:
+            d = os.read(0, 4096)
+            if not d:
+                break
+            d = itail + d
+            if VOICE in d:
+                d = d.replace(VOICE, b"")
+                if stt is None:
+                    try:
+                        stt = subprocess.Popen(["termux-speech-to-text"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                    except OSError:
+                        stt = None  # termux-api가 없으면 그냥 무시
+            k = keep_len(d, VOICE)
+            itail, d = (d[-k:], d[:-k]) if k else (b"", d)
+            if d:
+                os.write(fd, d)
+        if stt and stt.stdout in r:
+            chunk = os.read(stt.stdout.fileno(), 65536)
+            if chunk:
+                heard += chunk
+            else:  # 인식 끝
+                stt.wait(); stt = None
+                lines = [l.strip() for l in heard.decode("utf-8", "replace").splitlines() if l.strip()]
+                heard = b""
+                if lines:
+                    os.write(fd, lines[-1].encode())  # 마지막 줄 = 최종 결과(앞 줄들은 중간 결과)
+        if fd in r:
+            try:
+                d = os.read(fd, 65536)
+            except OSError:
+                break
+            if not d:
+                break
+            if mosh:
+                d = (otail + d).replace(ON, FIX)
+                k = keep_len(d, ON)
+                otail, d = (d[-k:], d[:-k]) if k else (b"", d)
+            os.write(1, d)
+finally:
+    if otail:
+        os.write(1, otail)
+    termios.tcsetattr(0, termios.TCSADRAIN, old)
+    try:
+        os.waitpid(pid, 0)
+    except ChildProcessError:
+        pass
