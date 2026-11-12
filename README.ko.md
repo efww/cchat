@@ -78,6 +78,7 @@ cchat 탭 아무 데서나 claude에게 "PC는 다크 테마로", "폰 글자 �
 |---|---|
 | `cchat-set` | 지금 설정 보기 |
 | `cchat-set tab ctx off` | 탭의 대화 크기(42k) 표시 끄기 |
+| `cchat-set tab rows 2` | 탭 줄 수 1~5. 1(기본)은 탭이 2줄 높이(번호/이름), 2~5는 한 줄짜리 탭을 그 줄 수에 나눠 배치(탭이 많을 때) |
 | `cchat-set font phone 16` / `font pc off` | 기기별 글자 크기(`off` = `FONT_SIZE`) |
 | `cchat-set theme pc dark` | 기기별 라이트/다크(기본 PC 라이트, 폰 다크) |
 | `cchat-set notify on\|off`, `notify pc\|phone\|telegram\|done\|ask on\|off`, `quiet 01-08` | 알림(알림 훅 필요, 아래) |

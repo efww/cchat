@@ -367,7 +367,7 @@ SCRIPT = """<script id="cchat-script">
     el.dataset.cchatTouch = '1';
     // 브라우저는 touchmove를 손가락이 ~16px 움직인 뒤에야 보낸다(시작이 굼뜬 원인).
     // pointermove는 2px부터 오므로 이동 계산은 포인터 이벤트로 한다(touch-action:none 필요).
-    const STATUS_ROWS = 2;  // tmux 상태줄(대화 탭) 줄 수 = config/tmux.conf의 status
+    const STATUS_ROWS = SET.statusRows;  // tmux 상태줄(대화 탭) 줄 수 = cchat-tabs apply가 맞춘 status
     let pid = null, lastY = null, acc = 0, moves = 0, wheels = 0, reports = 0, downX = 0, downY = 0;
     // 손가락 위치 → 터미널 칸(열,줄). 여백을 뺀 실제 글자 영역(.xterm-screen) 기준.
     const cellAt = (x, y) => {
@@ -747,7 +747,8 @@ SCRIPT = """<script id="cchat-script">
     if (!term || !term.buffer || document.hidden) return;
     const buf = term.buffer.active, rows = term.rows, cols = term.cols;
     const spots = [];
-    const y = rows - 2;  // 탭 위 줄(번호)
+    // 탭 줄(맨 아래 SET.statusRows줄) 중 작업 중 표시가 있는 줄. 기본 모드는 위 줄(번호)에만 표시가 있다.
+    for (let y = rows - SET.statusRows; y < rows; y++) {
     const line = buf.getLine(buf.viewportY + y);
     if (line) {
       let x = 0;
@@ -769,10 +770,11 @@ SCRIPT = """<script id="cchat-script">
           const pal = theme.extendedAnsi || [];
           const fi = nc && nc.isFgPalette() ? nc.getFgColor() : -1;
           const color = fi >= 16 && pal[fi - 16] ? pal[fi - 16] : theme.foreground;
-          if (at <= b) spots.push([at, color]);
+          if (at <= b) spots.push([y, at, color]);
           x = b + 1;
         } else x++;
       }
+    }
     }
     const scr = term.element && term.element.querySelector('.xterm-screen');
     const r = scr ? scr.getBoundingClientRect() : null;
@@ -783,7 +785,7 @@ SCRIPT = """<script id="cchat-script">
     el.textContent = '';
     if (!r || !spots.length) return;
     const cw = r.width / cols, ch = r.height / rows;
-    for (const [at, color] of spots) {
+    for (const [y, at, color] of spots) {
       const d = document.createElement('div');
       // 점자 글자 대신 점 6개를 직접 그린다: 폰 글꼴은 점자 기호마다 폭이 달라 오른쪽 열만 있는 ⠸가 왼쪽으로 튀었다.
       const dot = Math.max(2, +(ch * 0.165).toFixed(1)), gap = Math.max(1, +(ch * 0.075).toFixed(1));  // 반올림하면 작은 차이가 사라져 소수점 px
@@ -855,7 +857,7 @@ SCRIPT = """<script id="cchat-script">
     if (!term || !term.buffer || document.hidden) return;
     const buf = term.buffer.active, rows = term.rows, found = [];
     let cursor = false;  // claude 선택 목록에는 고른 줄 앞에 ❯가 있다(답 속 번호 목록과 구분)
-    for (let y = 0; y < rows - 2; y++) {
+    for (let y = 0; y < rows - SET.statusRows; y++) {
       const line = buf.getLine(buf.viewportY + y);
       const m = line && CHOICE_RE.exec(line.translateToString(true));
       if (m) { found.push([m[1], m[2]]); if (/❯/.test(line.translateToString(true))) cursor = true; }
@@ -1011,7 +1013,9 @@ def settings() -> dict:
         snips = [l.strip() for l in SNIPS.read_text(encoding="utf-8").splitlines() if l.strip()][:30]
     except OSError:
         snips = []
-    return {"fontPc": font_px("font.pc"), "fontPhone": font_px("font.phone"), "snips": snips,
+    rows = setting("tab.rows", "1")
+    rows = min(5, max(1, int(rows))) if rows.isdigit() else 1
+    return {"statusRows": 2 if rows <= 1 else rows, "fontPc": font_px("font.pc"), "fontPhone": font_px("font.phone"), "snips": snips,
             "themePc": theme("theme.pc", "light"), "themePhone": theme("theme.phone", "dark")}
 
 

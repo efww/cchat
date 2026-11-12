@@ -78,6 +78,7 @@ Tell claude in any cchat tab, e.g. "dark theme on my PC" or "bigger font on my p
 |---|---|
 | `cchat-set` | Show current settings |
 | `cchat-set tab ctx off` | Hide the conversation size (42k) on tabs |
+| `cchat-set tab rows 2` | Tab rows, 1–5. 1 (default) = each tab is two lines tall (number/name); 2–5 = one-line tabs spread over that many rows (for many tabs) |
 | `cchat-set font phone 16` / `font pc off` | Font size per device (`off` = `FONT_SIZE`) |
 | `cchat-set theme pc dark` | Light/dark per device (default: PC light, phone dark) |
 | `cchat-set notify on\|off`, `notify pc\|phone\|telegram\|done\|ask on\|off`, `quiet 01-08` | Notifications (needs a notify hook, see below) |

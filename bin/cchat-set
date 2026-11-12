@@ -11,11 +11,12 @@
 #   cchat-set font pc|phone <px>|off   글자 크기(8~32, off=기본 @@FONT_SIZE@@) — 브라우저 새로고침 필요
 #   cchat-set theme pc|phone light|dark 색 테마(기본 PC=light, 폰=dark) — 브라우저 새로고침 필요
 #   cchat-set tab ctx on|off           탭에 대화 크기(42k) 표시(작업 중 걸린 시간은 그대로)
+#   cchat-set tab rows 1~5             탭 줄 수: 1 = 탭이 2줄 높이(기본), 2~5 = 한 줄짜리 탭을 N줄에 나눠 배치 — 브라우저 새로고침 필요
 # 내부용: cchat-set --devices-for <done|ask|test>  지금 알림을 보낼 기기 목록(없으면 빈 줄)
 F=@@HOME@@/.config/cchat/settings
 N=@@HOME@@/.config/cchat/notify
-typeset -A D=(notify on notify.pc on notify.phone on notify.telegram off notify.done on notify.ask on quiet off font.pc off font.phone off theme.pc light theme.phone dark tab.ctx on)
-ORDER=(notify notify.pc notify.phone notify.telegram notify.done notify.ask quiet font.pc font.phone theme.pc theme.phone tab.ctx)
+typeset -A D=(notify on notify.pc on notify.phone on notify.telegram off notify.done on notify.ask on quiet off font.pc off font.phone off theme.pc light theme.phone dark tab.ctx on tab.rows 1)
+ORDER=(notify notify.pc notify.phone notify.telegram notify.done notify.ask quiet font.pc font.phone theme.pc theme.phone tab.ctx tab.rows)
 
 get() { local v; v=$(grep -m1 "^$1=" $F 2>/dev/null | cut -d= -f2-); print -r -- "${v:-${D[$1]}}"; }
 put() {
@@ -71,9 +72,13 @@ case "${1:-}" in
     [[ "${2:-}" == (pc|phone) && "${3:-}" == (light|dark) ]] || { print -u2 "cchat-set theme pc|phone light|dark"; exit 2; }
     put theme.$2 $3; rebuild ;;
   tab)
-    [[ "${2:-}" == ctx ]] || { print -u2 "cchat-set tab ctx on|off"; exit 2; }
-    onoff "${3:-}"; put tab.ctx $3
-    @@BREW@@/tmux -L @@TMUX_SOCKET@@ refresh-client -S 2>/dev/null; true ;;
+    case "${2:-}" in
+      ctx) onoff "${3:-}"; put tab.ctx $3
+        @@BREW@@/tmux -L @@TMUX_SOCKET@@ refresh-client -S 2>/dev/null; true ;;
+      rows) [[ "${3:-}" == [1-5] ]] || { print -u2 "cchat-set tab rows 1~5"; exit 2; }
+        put tab.rows $3; @@HOME@@/.local/bin/cchat-tabs apply; rebuild ;;
+      *) print -u2 "cchat-set tab ctx on|off | tab rows 1~5"; exit 2 ;;
+    esac ;;
   -h|--help|help) sed -n '2,16p' $0 | sed 's/^# \{0,1\}//' ;;
   *) print -u2 "모르는 설정: $1 (cchat-set help)"; exit 2 ;;
 esac

@@ -15,6 +15,8 @@
   cchat-tabs go <client> <prev|next|attention|번호>
       PC 단축키(Alt+←/→, Alt+숫자, Alt+A): 탭 순서로 이전/다음 대화(끝에서 돌아감), 그 번호 대화(0=main),
       attention = 확인할 대화(주황 먼저, 없으면 녹색). 폰 키 바의 ★도 Alt+A를 보낸다.
+  cchat-tabs apply
+      cchat-set tab rows N 값에 맞춰 tmux 상태줄 줄 수를 바꾼다(1 → 2줄 높이 탭, 2~5 → 한 줄짜리 탭을 N줄에 배치).
   cchat-tabs click <client> _new
       맨 끝 + 칸: 빈 번호로 새 대화를 만들어 옮긴다. 넘쳐서 ◀ ▶가 생기면 그 뒤에 숨은 확인할 대화 수를 화살표 색·숫자로 보여 준다.
 """
@@ -254,7 +256,7 @@ def box(style, text, w, rng=None, busy=False):
                 text = clip(lab, w - 1)
     pad = max(0, w - width_of(text))
     left = pad // 2 if not rng or rng.startswith("_") else min(1, pad)  # 탭 이름은 왼쪽 정렬(한 칸 띄움), 화살표는 가운데
-    sp = (lambda n: f"#[fg=colour{BUSY_MARK}]{' ' * n}{style}") if busy else (lambda n: " " * n)
+    sp = (lambda n: f"#[fg=colour{BUSY_MARK}]{' ' * n}{style}") if busy and not PAD_LINE else (lambda n: " " * n)
     body = f"{style}{sp(left)}{text}{sp(pad - left)}"
     if rng:
         return f"#[range=user|{rng}]{body}#[norange]{PLAIN}"
@@ -356,6 +358,55 @@ def render(client, width, cur, tabs):
     return f"{left}{' ' * GAP}{mid}{' ' * (GAP + rest)}{right}{' ' * GAP}{plus_box()}"
 
 
+def tab_rows():
+    """cchat-set tab rows N: 1 = 탭 하나가 2줄 높이(번호/이름)인 한 줄 탭, 2~5 = 한 줄짜리 탭을 N줄에 나눠 배치."""
+    v = setting("tab.rows", "1")
+    return min(5, max(1, int(v))) if v.isdigit() else 1
+
+
+def status_lines():
+    rows = tab_rows()
+    return 2 if rows <= 1 else rows
+
+
+def row_box(name, unread, cur, w):
+    """여러 줄 모드의 한 줄짜리 탭: ' 번호 ◌ 이름표 … 42k' (◌ = 작업 중 스피너 자리, 브라우저가 그림)."""
+    lab = label(name)
+    head = lab + "   "
+    room = w - 1 - width_of(head)
+    if room < 2:
+        text = clip(lab, max(1, w - 1))
+    else:
+        title, m = tab_label(name), meta(name)
+        if m and room >= len(m) + 4:
+            r = room - len(m) - 1
+            t = clip(title, r)
+            text = head + t + " " * (r - width_of(t)) + " " + m
+        else:
+            text = head + clip(title, room)
+    return box(style_of(name, unread, cur), text, w, name, is_busy(name, unread, cur))
+
+
+def render_rows(width, cur, tabs, rows, line):
+    """여러 줄 모드: 탭을 앞에서부터 줄마다 같은 개수씩 채운다(칸 폭이 같아 위아래 줄이 맞는다). + 는 마지막 줄 끝."""
+    k = max(1, -(-len(tabs) // rows))  # 한 줄 탭 수
+    avail = width - PLUS_W - GAP
+    share = max(TAB_W, (avail - GAP * (k - 1)) // k)
+    chunk = tabs[line * k:(line + 1) * k]
+    out = (" " * GAP).join(row_box(n, u, cur, share) for n, u in chunk)
+    if line == rows - 1:
+        used = len(chunk) * share + GAP * max(0, len(chunk) - 1)
+        out += " " * max(GAP, avail - used + GAP) + plus_box()
+    return out + PLAIN
+
+
+def apply_rows():
+    """설정한 탭 줄 수에 맞게 tmux 상태줄 줄 수를 바꾼다(cchat-set tab rows, tmux 시작 때)."""
+    tmux("set", "-g", "status", str(status_lines()))
+    gen = tmux("show", "-gv", "@cchat_tabgen") or "0"
+    tmux("set", "-g", "@cchat_tabgen", str(int(gen) + 1 if gen.isdigit() else 1))
+
+
 def tmux(*args):
     return subprocess.run(TMUX + list(args), capture_output=True, text=True).stdout.strip()
 
@@ -429,9 +480,21 @@ def go(client, which):
 def main(argv):
     global PAD_LINE
     if len(argv) >= 5 and argv[0] == "render":
-        PAD_LINE = len(argv) >= 7 and argv[6] == "pad"
+        # 줄 인자: l0~l4(status-format[0~4]). 예전 text/pad도 받는다.
+        which = argv[6] if len(argv) >= 7 else "l0"
+        line = {"text": 0, "pad": 1}.get(which, int(which[1:]) if which[1:].isdigit() else 0)
         client, width, cur, names = argv[1], int(argv[2] or 80), argv[3], argv[4]
-        print(render(client, width, cur, parse(names)))
+        rows = tab_rows()
+        if rows <= 1:
+            if line > 1:
+                print("")
+                return 0
+            PAD_LINE = line == 1
+            print(render(client, width, cur, parse(names)))
+        else:
+            print(render_rows(width, cur, parse(names), rows, line) if line < rows else "")
+    elif argv[:1] == ["apply"]:
+        apply_rows()
     elif len(argv) == 3 and argv[0] == "go":
         go(argv[1], argv[2])
     elif len(argv) == 3 and argv[0] == "click":
