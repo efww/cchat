@@ -688,7 +688,7 @@ SCRIPT = """<script id="cchat-script">
     if (!el) {
       const st = document.createElement('style');
       st.textContent = '#cchat-busy{position:fixed;inset:0;pointer-events:none;z-index:5}'
-        + '#cchat-busy div{position:fixed;pointer-events:none;background:' + (dark ? 'rgba(255,255,255,.18)' : 'rgba(0,0,0,.17)')
+        + '#cchat-busy div{position:fixed;pointer-events:none;background:' + (dark ? 'rgba(230,180,40,.30)' : 'rgba(215,165,0,.40)')
         + '}';
       document.head.appendChild(st);
       el = document.createElement('div');
