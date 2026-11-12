@@ -716,12 +716,21 @@ SCRIPT = """<script id="cchat-script">
   // 모든 탭의 기호는 시계 기준으로 같은 모양을 보여 같이 돈다.
   const BUSY_MARK = 123, SPIN = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏', SPIN_MS = 150;
   let busyKey = '';
+  // 점자 한 글자 = 점 6개(1·2·3 왼쪽 열 위→아래, 4·5·6 오른쪽 열). 그 칸의 점 무늬(비트)를 돌린다.
+  const SPIN_BITS = [...SPIN].map((c) => c.charCodeAt(0) - 0x2800);
+  const spinFrame = (now) => SPIN_BITS[Math.floor((now || Date.now()) / SPIN_MS) % SPIN_BITS.length];
+  const paintSpin = (d, bits) => {
+    if (d.dataset.bits === String(bits)) return;
+    d.dataset.bits = bits;
+    for (let k = 0; k < 6; k++) d.children[k].className = bits >> k & 1 ? 'on' : '';
+  };
   const busyLayer = () => {
     let el = document.getElementById('cchat-busy');
     if (!el) {
       const st = document.createElement('style');
       st.textContent = '#cchat-busy{position:fixed;inset:0;pointer-events:none;z-index:5}'
-        + '#cchat-busy div{position:fixed;pointer-events:none;display:flex;align-items:center;justify-content:center;font-weight:700}';
+        + '#cchat-busy>div{position:fixed;pointer-events:none;display:grid;grid-template-rows:repeat(3,auto);grid-auto-flow:column;place-content:center}'
+        + '#cchat-busy i{border-radius:50%;background:currentColor;opacity:0}#cchat-busy i.on{opacity:1}';
       document.head.appendChild(st);
       el = document.createElement('div');
       el.id = 'cchat-busy';
@@ -770,11 +779,13 @@ SCRIPT = """<script id="cchat-script">
     el.textContent = '';
     if (!r || !spots.length) return;
     const cw = r.width / cols, ch = r.height / rows;
-    const fs = (term.options && term.options.fontSize) || 13;
     for (const [at, color] of spots) {
       const d = document.createElement('div');
-      d.style.cssText = `left:${r.left + at * cw}px;top:${r.top + y * ch}px;width:${cw}px;height:${ch}px;font-size:${Math.round(fs * 1.3)}px;color:${color}`;
-      d.textContent = SPIN[Math.floor(Date.now() / SPIN_MS) % SPIN.length];
+      // 점자 글자 대신 점 6개를 직접 그린다: 폰 글꼴은 점자 기호마다 폭이 달라 오른쪽 열만 있는 ⠸가 왼쪽으로 튀었다.
+      const dot = Math.max(3, Math.round(ch * 0.19)), gap = Math.max(1, Math.round(ch * 0.09));
+      d.style.cssText = `left:${r.left + at * cw}px;top:${r.top + y * ch}px;width:${cw}px;height:${ch}px;gap:${gap}px;color:${color}`;
+      for (let k = 0; k < 6; k++) { const i = document.createElement('i'); i.style.cssText = `width:${dot}px;height:${dot}px`; d.appendChild(i); }
+      paintSpin(d, spinFrame());
       el.appendChild(d);
     }
   };
@@ -785,8 +796,8 @@ SCRIPT = """<script id="cchat-script">
     const now = Date.now();
     const el = document.getElementById('cchat-busy');
     if (el && el.firstChild && !document.hidden) {
-      const ch = SPIN[Math.floor(now / SPIN_MS) % SPIN.length];
-      for (const d of el.children) if (d.textContent !== ch) d.textContent = ch;
+      const f = spinFrame(now);
+      for (const d of el.children) paintSpin(d, f);
     }
     setTimeout(spinTick, SPIN_MS - (now % SPIN_MS) + 5);
   };
