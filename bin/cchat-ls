@@ -367,6 +367,10 @@ def run_tui(client):
 
     def main(scr):
         nonlocal rows, other
+        try:
+            curses.set_escdelay(25)  # Esc가 1초 늦게 먹히지 않게(환경변수만으로는 안 먹는 경우가 있다)
+        except AttributeError:
+            pass
         curses.curs_set(0)
         curses.use_default_colors()
         curses.mousemask(curses.ALL_MOUSE_EVENTS | curses.REPORT_MOUSE_POSITION)
@@ -427,7 +431,19 @@ def run_tui(client):
             msg = ""
             items = rows + other
             ch = KOR.get(ch, ch) if isinstance(ch, str) else ch  # 한글 입력 상태에서 눌러도 같은 키로
-            if ch in ("q", "\x1b", curses.KEY_EXIT):
+            if ch == "\x1b":  # Esc 단독이면 닫기. 뒤에 글자가 붙어 오면(포커스 알림 ESC [ I 등) 그 묶음은 버린다
+                scr.timeout(30)
+                rest = []
+                try:
+                    while True:
+                        rest.append(scr.get_wch())
+                except curses.error:
+                    pass
+                scr.timeout(2000)
+                if rest:
+                    continue
+                return
+            if ch in ("q", curses.KEY_EXIT):
                 return
             if ch in (curses.KEY_UP, "k"):
                 sel = max(0, sel - 1)

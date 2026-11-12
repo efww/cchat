@@ -688,6 +688,36 @@ SCRIPT = """<script id="cchat-script">
 
   // PC 대화 탭 단축키: Alt(Option)+숫자 = 그 번호 대화, Alt+←/→ = 이전/다음 대화, Alt+↑/↓ = 위/아래 칸(여러 줄 모드).
   // 맥 Option+숫자는 ¡ 같은 글자가 돼 버리므로 e.code로 잡아 tmux의 M-숫자 / M-←→ 키로 보낸다(tmux.conf가 탭 이동으로 묶음).
+  // 세션 목록(cchat-ls, Alt+L)이 떠 있을 때 한글 입력 상태로 누른 키(ㅌ 등)는 IME가 조합 중으로 붙잡아 두어
+  // 다음 키를 칠 때까지 터미널로 안 간다. 목록이 떠 있으면 조합 글자(자모 하나)를 바로 보내고(cchat-ls가 ㅌ→x 처럼 받음),
+  // 조합이 끝날 때 xterm이 같은 글자를 또 보내지 않게 막는다. 조합 중 Enter도 바로 보낸다. 목록인지는 팝업 머리줄 글자로 안다.
+  const lsOpen = () => {
+    const t = window.term; if (!t) return false;
+    const b = t.buffer.active;
+    for (let y = 0; y < 3; y++) { const l = b.getLine(b.viewportY + y); if (l && l.translateToString(true).includes('Claude 세션 —')) return true; }
+    return false;
+  };
+  let lsComp = false;
+  const JAMO = /^[\u3131-\u3163]$/;
+  document.addEventListener('compositionstart', (e) => {
+    const t = window.term && window.term.textarea;
+    lsComp = !!t && e.target === t && lsOpen();
+  }, true);
+  document.addEventListener('compositionupdate', (e) => {
+    if (lsComp && JAMO.test(e.data || '')) window.term.input(e.data, true);
+  }, true);
+  document.addEventListener('compositionend', (e) => {
+    if (!lsComp) return;
+    lsComp = false;
+    e.stopImmediatePropagation();
+    const t = window.term && window.term.textarea;
+    setTimeout(() => { if (t) t.value = ''; }, 0);
+  }, true);
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.isComposing || e.keyCode === 229) && lsOpen() && window.term) {
+      e.preventDefault(); e.stopImmediatePropagation(); window.term.input('\\r', true);
+    }
+  }, true);
   if (!mobile) {
     window.addEventListener('keydown', (e) => {
       // Ctrl+V: 터미널로 ^V를 보내면 claude가 ttyd를 돌리는 맥의 클립보드를 읽어 붙인다. 키는 막고(전파 중단)
