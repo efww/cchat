@@ -261,7 +261,7 @@ def box(style, text, w, rng=None, busy=False):
     tint = ""
     if busy and not PAD_LINE and SPIN and w - width_of(text) >= 3:
         text = f"{text} {SPIN}"  # 터미널(Termux·ssh 등)의 스피너, 또는 play 설정의 ▶를 글자로 직접 그린다
-        if SPIN in ("▶", "⏵"):  # 멈춘 ▶는 녹색. 지금 탭은 바탕이 반대 밝기라 대비가 맞는 녹색(colour71)
+        if SPIN == "▶":  # 멈춘 ▶는 녹색. 지금 탭은 바탕이 반대 밝기라 대비가 맞는 녹색(colour71)
             tint = f"{text[:-1]}#[fg=colour{CUR_GREEN if style == CUR else DONE_FG}]{SPIN}{style}"
     pad = max(0, w - width_of(text))
     left = pad // 2 if not rng or rng.startswith("_") else min(1, pad)  # 탭 이름은 왼쪽 정렬(한 칸 띄움), 화살표는 가운데
@@ -697,8 +697,8 @@ def main(argv):
         if line == 0 or rows > 1:
             page = is_page(client)
             ARROWS = "⏴⏵" if page else "◀▶"
-            # play면 멈춘 삼각형을 글자로. 페이지(xterm)는 ▶가 칸 가득 크고 ▸는 너무 작아 중간 크기 ⏵. spinner면 페이지는 JS, 터미널은 점자 글자
-            SPIN = ("⏵" if page else "▶") if setting("tab.busy", "spinner") == "play" else "" if page \
+            # 페이지(브라우저)는 늘 JS가 그리는 스피너(빈칸 표시만). play 설정은 터미널(Termux 등)에만: 멈춘 ▶, 아니면 점자 글자
+            SPIN = "" if page else "▶" if setting("tab.busy", "spinner") == "play" \
                 else SPIN_FRAMES[int(time.time()) % len(SPIN_FRAMES)]
         if rows <= 1:
             if line > 1:

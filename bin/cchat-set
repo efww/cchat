@@ -13,7 +13,7 @@
 #   cchat-set tab ctx on|off           탭에 대화 크기(42k) 표시(작업 중 걸린 시간은 그대로)
 #   cchat-set tab rows 1~5             탭 줄 수: 1 = 탭이 2줄 높이(기본), 2 = 두 줄 탭(번호/이름)을 2줄, 3~5 = 한 줄짜리 탭을 N줄에 배치(높이도 그 기본값으로) — 브라우저 새로고침 필요
 #   cchat-set tab height 1~2.5         여러 줄 모드의 탭 높이를 따로 바꿈(1 = 글자 한 줄, 1.5 = 한 줄 반). 상태줄은 5줄까지라 줄 수×높이가 넘치면 낮춘다
-#   cchat-set tab busy spinner|play    작업 중 탭 표시: spinner = 도는 스피너(기본, 터미널은 5초마다 한 칸), play = 움직이지 않는 녹색 ▶. 브라우저·터미널 모두에 적용
+#   cchat-set tab busy spinner|play    작업 중 탭 표시: spinner = 도는 스피너(기본, 터미널은 5초마다 한 칸), play = 움직이지 않는 녹색 ▶. 터미널(Termux 등)에만 적용, 브라우저는 늘 스피너
 #   cchat-set auto <탭> on|off         자동 진행: 그 탭의 답이 끝나면 내가 그 탭에 한 지시를 기준으로 다음 입력을 대신 보냄(cchat-auto). 위험한 일·애매하면 멈추고 알림
 # 내부용: cchat-set --devices-for <done|ask|test>  지금 알림을 보낼 기기 목록(없으면 빈 줄)
 F=@@HOME@@/.config/cchat/settings
