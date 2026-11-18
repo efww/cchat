@@ -261,7 +261,7 @@ def box(style, text, w, rng=None, busy=False):
     tint = ""
     if busy and not PAD_LINE and SPIN and w - width_of(text) >= 3:
         text = f"{text} {SPIN}"  # 터미널(Termux·ssh 등)의 스피너, 또는 play 설정의 ▶를 글자로 직접 그린다
-        if SPIN in ("▶", "⏵"):  # 멈춘 ▶는 녹색. 지금 탭은 바탕이 반대 밝기라 대비가 맞는 녹색(colour71)
+        if SPIN in GREEN_MARKS:  # 멈춘 ▶와 깜빡이는 ●○는 녹색. 지금 탭은 바탕이 반대 밝기라 대비가 맞는 녹색(colour71)
             tint = f"{text[:-1]}#[fg=colour{CUR_GREEN if style == CUR else DONE_FG}]{SPIN}{style}"
     pad = max(0, w - width_of(text))
     left = pad // 2 if not rng or rng.startswith("_") else min(1, pad)  # 탭 이름은 왼쪽 정렬(한 칸 띄움), 화살표는 가운데
@@ -274,6 +274,8 @@ def box(style, text, w, rng=None, busy=False):
 
 SPIN = ""  # 이번 스피너 글자(main에서 정함). 빈 값이면 페이지 JS가 그린다
 SPIN_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+BLINK_FRAMES = "●○"  # tab.busy=blink: 1초마다 채운 원/빈 원(둘 다 녹색)
+GREEN_MARKS = ("▶", "⏵", "●", "○")
 # 넘칠 때 양 끝 화살표. 브라우저(xterm)는 ◀ ▶를 칸 가득 크게 그려서 중간 크기 ⏴ ⏵를 쓴다. 터미널(Termux)은 ◀ ▶가 알맞다
 ARROWS = "◀▶"
 
@@ -699,11 +701,13 @@ def main(argv):
             ARROWS = "⏴⏵" if page else "◀▶"
             # 작업 중 표시. 브라우저는 tab.busy.web, 터미널(Termux 등)은 tab.busy.
             # 브라우저: spinner = JS가 그리는 스피너(빈칸 표시만), play = 멈춘 ⏵(xterm은 ▶를 칸 가득 크게 그려 중간 크기).
-            # 터미널: play = 멈춘 ▶, spinner = 점자 글자
+            # 터미널: play = 멈춘 ▶, blink = 녹색 ●○ 깜빡임, spinner = 점자 글자
             if page:
                 SPIN = "⏵" if setting("tab.busy.web", "spinner") == "play" else ""
             else:
-                SPIN = "▶" if setting("tab.busy", "spinner") == "play" else SPIN_FRAMES[int(time.time()) % len(SPIN_FRAMES)]
+                mode = setting("tab.busy", "spinner")
+                frames = BLINK_FRAMES if mode == "blink" else SPIN_FRAMES
+                SPIN = "▶" if mode == "play" else frames[int(time.time()) % len(frames)]
         if rows <= 1:
             if line > 1:
                 print("")
