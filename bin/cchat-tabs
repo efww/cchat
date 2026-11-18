@@ -276,6 +276,28 @@ SPIN = ""  # 이번 스피너 글자(main에서 정함). 빈 값이면 페이지
 SPIN_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 BLINK_FRAMES = "●○"  # tab.busy=blink: 1초마다 채운 원/빈 원(둘 다 녹색)
 GREEN_MARKS = ("▶", "⏵", "●", "○")
+
+
+def blink_frame(client):
+    """blink의 이번 글자. 시각(초)으로 고르면 tmux 갱신 간격(실측 1.0~1.16초)이 밀릴 때 같은 글자가 2초씩 이어진다.
+    그래서 클라이언트별로 직전 글자를 기억해 갱신마다 뒤집는다. 0.5초 안의 다시 그리기(여러 줄, 훅의 refresh)는 같은 글자."""
+    path = os.path.join(STATE, "blink-" + client.replace("/", "_"))
+    now = time.time()
+    try:
+        with open(path) as f:
+            idx, last = f.read().split()
+        idx, last = int(idx), float(last)
+    except (OSError, ValueError):
+        idx, last = 0, 0.0
+    if now - last >= 0.5:
+        idx, last = 1 - idx, now
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w") as f:
+                f.write(f"{idx} {last}")
+        except OSError:
+            pass
+    return BLINK_FRAMES[idx]
 # 넘칠 때 양 끝 화살표. 브라우저(xterm)는 ◀ ▶를 칸 가득 크게 그려서 중간 크기 ⏴ ⏵를 쓴다. 터미널(Termux)은 ◀ ▶가 알맞다
 ARROWS = "◀▶"
 
@@ -704,11 +726,10 @@ def main(argv):
             # 터미널: play = 멈춘 ▶, blink = 녹색 ●○ 깜빡임, spinner = 점자 글자
             if page:
                 wmode = setting("tab.busy.web", "spinner")
-                SPIN = "⏵" if wmode == "play" else BLINK_FRAMES[int(time.time()) % len(BLINK_FRAMES)] if wmode == "blink" else ""
+                SPIN = "⏵" if wmode == "play" else blink_frame(client) if wmode == "blink" else ""
             else:
                 mode = setting("tab.busy", "spinner")
-                frames = BLINK_FRAMES if mode == "blink" else SPIN_FRAMES
-                SPIN = "▶" if mode == "play" else frames[int(time.time()) % len(frames)]
+                SPIN = "▶" if mode == "play" else blink_frame(client) if mode == "blink" else SPIN_FRAMES[int(time.time()) % len(SPIN_FRAMES)]
         if rows <= 1:
             if line > 1:
                 print("")
