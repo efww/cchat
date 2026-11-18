@@ -700,10 +700,11 @@ def main(argv):
             page = is_page(client)
             ARROWS = "⏴⏵" if page else "◀▶"
             # 작업 중 표시. 브라우저는 tab.busy.web, 터미널(Termux 등)은 tab.busy.
-            # 브라우저: spinner = JS가 그리는 스피너(빈칸 표시만), play = 멈춘 ⏵(xterm은 ▶를 칸 가득 크게 그려 중간 크기).
+            # 브라우저: spinner = JS가 그리는 스피너(빈칸 표시만), play = 멈춘 ⏵(xterm은 ▶를 칸 가득 크게 그려 중간 크기), blink = 터미널과 같은 녹색 ●○.
             # 터미널: play = 멈춘 ▶, blink = 녹색 ●○ 깜빡임, spinner = 점자 글자
             if page:
-                SPIN = "⏵" if setting("tab.busy.web", "spinner") == "play" else ""
+                wmode = setting("tab.busy.web", "spinner")
+                SPIN = "⏵" if wmode == "play" else BLINK_FRAMES[int(time.time()) % len(BLINK_FRAMES)] if wmode == "blink" else ""
             else:
                 mode = setting("tab.busy", "spinner")
                 frames = BLINK_FRAMES if mode == "blink" else SPIN_FRAMES
