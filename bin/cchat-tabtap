@@ -1,0 +1,45 @@
+#!/bin/zsh
+# 탭 줄의 대화 탭을 눌렀을 때. tmux.conf의 MouseDown1Status(한 번)·DoubleClick1Status(두 번) 바인딩이 부른다.
+#   cchat-tabtap <클라이언트> <탭>          한 번: 그 대화로 이동(닫기 대기 중인 그 탭이면 닫기)
+#   cchat-tabtap <클라이언트> <탭> double   두 번: 그 탭을 '닫기 대기'(빨간 바탕 흰 글씨, 5초)
+# 닫기 = 그 대화에 /exit. 작업 중인 탭은 닫지 않고 알림. 다른 탭을 누르거나 5초가 지나면 대기가 풀린다.
+# tmux는 빠른 두 번째 누름을 MouseDown 대신 DoubleClick으로, 세 번째를 TripleClick으로 보낸다(실측).
+# TripleClick은 묶지 않는다: 닫기는 빨간 탭을 보고 따로 한 번 더 눌러야 한다(실수로 세 번 눌러 닫히지 않게).
+zmodload zsh/datetime
+T=(@@BREW@@/tmux -L @@TMUX_SOCKET@@)
+client=${1:-} r=${2:-} kind=${3:-}
+[[ -n "$client" && -n "$r" ]] || exit 0
+armed=$($T show -gqv @cchat_close)
+
+if [[ "$kind" == double ]]; then
+  now=$EPOCHREALTIME
+  $T set -g @cchat_close "$r"; $T set -g @cchat_close_t "$now"
+  $T display-message -c "$client" -d 3000 "한 번 더 누르면 ${r}번 탭을 닫습니다"
+  $T refresh-client -S
+  ( sleep 5; [[ "$($T show -gqv @cchat_close_t)" == "$now" ]] && { $T set -gu @cchat_close; $T set -gu @cchat_close_t; $T refresh-client -S; } ) </dev/null >/dev/null 2>&1 &!
+  exit 0
+fi
+
+if [[ -n "$armed" ]]; then
+  $T set -gu @cchat_close; $T set -gu @cchat_close_t
+  if [[ "$armed" == "$r" ]]; then
+    if [[ -n "$($T show -t "=$r:" -qv @busy)" ]]; then
+      $T display-message -c "$client" -d 3000 "${r}번은 작업 중이라 닫지 않았습니다"
+      $T refresh-client -S; exit 0
+    fi
+    pp=$($T display -p -t "=$r:" '#{pane_pid}')
+    if pgrep -P "$pp" claude >/dev/null 2>&1; then
+      $T send-keys -t "=$r:" C-u
+      $T send-keys -t "=$r:" -l /exit
+      $T send-keys -t "=$r:" Enter
+      # /exit가 안 먹으면(대화상자 등) 8초 뒤 그 탭만 닫는다
+      ( sleep 8; $T has -t "=$r" 2>/dev/null && $T kill-session -t "=$r" ) </dev/null >/dev/null 2>&1 &!
+    else
+      $T kill-session -t "=$r"
+    fi
+    $T refresh-client -S; exit 0
+  fi
+  $T refresh-client -S
+fi
+$T switch-client -c "$client" -t "=$r:"
+exit 0

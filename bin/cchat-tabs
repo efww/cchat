@@ -56,6 +56,16 @@ IDLE_1H = IDLE_6H
 ARROW_ON = _c(60, 61, True)
 ARROW_OFF = _c(60, 66)
 PLAIN = "#[default]"
+# 닫기 대기 탭(cchat-tabtap: 두 번 누름): 빨간 바탕 흰 글씨. 테마 색표와 무관하게 RGB로 직접(터미널 RGB 지원)
+CLOSING = "#[bg=#cf222e,fg=#ffffff,bold]"
+_closing = None
+
+
+def closing_tab():
+    global _closing
+    if _closing is None:
+        _closing = tmux("show", "-gqv", "@cchat_close").strip()
+    return _closing
 
 
 def state_path(client):
@@ -371,6 +381,8 @@ def idle_secs(name):
 
 
 def style_of(name, unread, cur):
+    if name == closing_tab():
+        return CLOSING
     if name == cur:
         return CUR
     if unread == "busy":
