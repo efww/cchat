@@ -9,6 +9,8 @@ export COLORTERM=truecolor
 setopt extendedglob
 WORKDIR=@@WORKDIR@@
 PERMISSION_MODE=@@PERMISSION_MODE@@
+# 설정 CODE_MODE=1이면 모든 탭의 claude를 Code Mode로 띄운다(새 탭·다시 시작·cchat-restart 모두 여기를 지난다)
+[[ @@CODE_MODE@@ == 1 ]] && export CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1
 TMUX_CMD=(@@BREW@@/tmux -L @@TMUX_SOCKET@@ -f @@HOME@@/.config/cchat/tmux.conf)
 NAME_RE='^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$'
 

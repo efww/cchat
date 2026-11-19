@@ -20,11 +20,12 @@ source "$conf"
 # CLAUDE_BIN = claude 실행 파일(없으면 지금 PATH에서 찾는다. nvm·npm으로 깐 경우도 그대로 잡힌다).
 : ${TMUX_SOCKET:=cchat}
 : ${INBOX_REMOTE:=}     # 폰 📎 업로드를 받아 둘 원격 "호스트:폴더"(원격 중계가 있을 때만, 비우면 끔)
+: ${CODE_MODE:=0}     # 1이면 claude를 Code Mode(CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1)로 띄운다(실험 기능)
 : ${KEEP_AWAKE:=0}     # 1이면 ttyd가 떠 있는 동안 맥이 잠들지 않게(caffeinate -is)
 : ${BASE_PATH:=/cchat}   # ttyd 주소 경로(시험용 샌드박스는 /cchat/t 처럼 따로)
 [[ -n "${CLAUDE_BIN:-}" ]] || CLAUDE_BIN=$(command -v claude 2>/dev/null || true)
 [[ -n "$CLAUDE_BIN" ]] || { [[ -x $HOME_DIR/.local/bin/claude ]] && CLAUDE_BIN=$HOME_DIR/.local/bin/claude; }
-KEYS=(HOME_DIR BREW WORKDIR PERMISSION_MODE PORT FONT_SIZE LAUNCHD_PREFIX PUBLIC_URL TUNNEL_HOST TUNNEL_REMOTE_PORT TMUX_SOCKET CLAUDE_BIN BASE_PATH KEEP_AWAKE INBOX_REMOTE)
+KEYS=(HOME_DIR BREW WORKDIR PERMISSION_MODE PORT FONT_SIZE LAUNCHD_PREFIX PUBLIC_URL TUNNEL_HOST TUNNEL_REMOTE_PORT TMUX_SOCKET CLAUDE_BIN BASE_PATH KEEP_AWAKE INBOX_REMOTE CODE_MODE)
 for k in $KEYS AUTO_UPDATE; do [[ -v $k ]] || { print -u2 "설정에 $k 가 없습니다"; exit 2; }; done
 
 # 설치 전 점검: 하나라도 틀리면 아무것도 바꾸지 않고 멈춘다(예전엔 서비스가 조용히 죽거나 claude가 끝없이 재시작됐다).
@@ -36,6 +37,7 @@ for b in ttyd tmux; do [[ -x $BREW/$b ]] || problems+=("$BREW/$b 가 없습니�
 [[ -d "$WORKDIR" ]] || problems+=("WORKDIR=$WORKDIR 폴더가 없습니다")
 [[ "$BASE_PATH" =~ '^(/[A-Za-z0-9_-]+)+$' ]] || problems+=("BASE_PATH=$BASE_PATH 형식은 /cchat 처럼")
 [[ "$KEEP_AWAKE" == (0|1) ]] || problems+=("KEEP_AWAKE 는 0 또는 1")
+[[ "$CODE_MODE" == (0|1) ]] || problems+=("CODE_MODE 는 0 또는 1")
 [[ "$TMUX_SOCKET" =~ '^[A-Za-z0-9_-]+$' ]] || problems+=("TMUX_SOCKET=$TMUX_SOCKET 은 영문·숫자·-·_ 만")
 if [[ -z "${out:-}" ]]; then
   # 포트를 다른 프로그램이 쓰고 있으면 멈춘다(우리 ttyd면 괜찮음 — 재설치).
