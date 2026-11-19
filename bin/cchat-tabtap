@@ -24,12 +24,13 @@ if [[ "$armed" == "$r" ]]; then
     $T refresh-client -S; exit 0   # 작업 중인 탭은 닫지 않는다(빨간색만 풀림)
   fi
   pp=$($T display -p -t "=$r:" '#{pane_pid}')
+  sid=$($T display -p -t "=$r:" '#{session_id}')   # 8초 뒤 닫기는 id로: 그 사이 같은 번호로 새 탭이 생겨도 안 건드린다
   if pgrep -P "$pp" claude >/dev/null 2>&1; then
     $T send-keys -t "=$r:" C-u
     $T send-keys -t "=$r:" -l /exit
     $T send-keys -t "=$r:" Enter
     # /exit가 안 먹으면(대화상자 등) 8초 뒤 그 탭만 닫는다
-    ( sleep 8; $T has -t "=$r" 2>/dev/null && $T kill-session -t "=$r" ) </dev/null >/dev/null 2>&1 &!
+    ( sleep 8; $T has -t "$sid" 2>/dev/null && $T kill-session -t "$sid" ) </dev/null >/dev/null 2>&1 &!
   else
     $T kill-session -t "=$r"
   fi
