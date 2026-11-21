@@ -620,8 +620,9 @@ def render_tall(width, cur, tabs, line):
 
 
 def apply_rows():
-    """설정한 탭 줄 수에 맞게 tmux 상태줄 줄 수를 바꾼다(cchat-set tab rows, tmux 시작 때)."""
+    """설정한 탭 줄 수·위치(위/아래)에 맞게 tmux 상태줄을 바꾼다(cchat-set tab rows/place, tmux 시작 때)."""
     tmux("set", "-g", "status", str(status_lines()))
+    tmux("set", "-g", "status-position", "top" if setting("tab.place", "아래") in ("위", "top") else "bottom")  # cchat-set tab place 위|아래
     gen = tmux("show", "-gv", "@cchat_tabgen") or "0"
     tmux("set", "-g", "@cchat_tabgen", str(int(gen) + 1 if gen.isdigit() else 1))
 

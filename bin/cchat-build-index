@@ -377,7 +377,7 @@ SCRIPT = """<script id="cchat-script">
       const r = (term.element.querySelector('.xterm-screen') || term.element).getBoundingClientRect();
       const col = Math.min(term.cols, Math.max(1, Math.floor((x - r.left) / (r.width / Math.max(1, term.cols))) + 1));
       const row = Math.min(term.rows, Math.max(1, Math.floor((y - r.top) / (r.height / Math.max(1, term.rows))) + 1));
-      return { col, row, last: row > term.rows - STATUS_ROWS && y >= r.top };
+      return { col, row, last: (SET.tabTop ? row <= STATUS_ROWS : row > term.rows - STATUS_ROWS) && y >= r.top };
     };
     const onStatusRow = (y) => { const c = cellAt(0, y); return !!(c && c.last); };
     // claude 입력칸(─── 가로선 두 줄 사이, 선 포함)인가. 키보드는 여기를 탭할 때만 올린다.
@@ -392,7 +392,7 @@ SCRIPT = """<script id="cchat-script">
         return t.length >= 10 && /^─+$/.test(t);
       };
       const rules = [];
-      for (let r = term.rows - STATUS_ROWS; r >= 1 && rules.length < 2; r--) if (isRule(r)) rules.push(r);
+      for (let r = term.rows - (SET.tabTop ? 0 : STATUS_ROWS); r >= (SET.tabTop ? STATUS_ROWS + 1 : 1) && rules.length < 2; r--) if (isRule(r)) rules.push(r);
       if (rules.length < 2) return true;
       return row >= rules[1] && row <= rules[0];
     };
@@ -517,7 +517,7 @@ SCRIPT = """<script id="cchat-script">
           return;
         }
       }
-      // 맨 아래 상태줄(대화 탭, STATUS_ROWS줄)을 톡 치면 마우스 클릭으로 보낸다 → 대화 번호를 눌러 그 대화로 전환.
+      // 상태줄(대화 탭, STATUS_ROWS줄. 맨 아래 또는 tab place 위면 맨 위)을 톡 치면 마우스 클릭으로 보낸다 → 대화 번호를 눌러 그 대화로 전환.
       const term = window.term;
       if (e.type !== 'pointerup' || wheels || !term) return;
       if (Math.abs(e.clientX - downX) > 12 || Math.abs(e.clientY - downY) > 12) return;
@@ -548,7 +548,7 @@ SCRIPT = """<script id="cchat-script">
     };
     el.addEventListener('pointerup', end, { passive: true, capture: true });
     el.addEventListener('pointercancel', end, { passive: true, capture: true });
-    // 상태줄(맨 아래 STATUS_ROWS줄)을 누를 때는 터치 기본 동작을 막아 입력칸에 포커스가 가지 않게 한다
+    // 상태줄(맨 아래 또는 맨 위 STATUS_ROWS줄)을 누를 때는 터치 기본 동작을 막아 입력칸에 포커스가 가지 않게 한다
     // → 키보드가 내려가 있으면 그대로 둔다. 클릭은 위 pointerup이 tmux로 보낸다.
     for (const type of ['touchstart', 'touchend']) {
       el.addEventListener(type, (e) => {
@@ -782,8 +782,8 @@ SCRIPT = """<script id="cchat-script">
     if (!term || !term.buffer || document.hidden) return;
     const buf = term.buffer.active, rows = term.rows, cols = term.cols;
     const spots = [];
-    // 탭 줄(맨 아래 SET.statusRows줄) 중 작업 중 표시가 있는 줄. 기본 모드는 위 줄(번호)에만 표시가 있다.
-    for (let y = rows - SET.statusRows; y < rows; y++) {
+    // 탭 줄(맨 아래, tab place 위면 맨 위 SET.statusRows줄) 중 작업 중 표시가 있는 줄. 기본 모드는 위 줄(번호)에만 표시가 있다.
+    for (let y = SET.tabTop ? 0 : rows - SET.statusRows; y < (SET.tabTop ? SET.statusRows : rows); y++) {
     const line = buf.getLine(buf.viewportY + y);
     if (line) {
       let x = 0;
@@ -893,7 +893,7 @@ SCRIPT = """<script id="cchat-script">
     if (!term || !term.buffer || document.hidden) return;
     const buf = term.buffer.active, rows = term.rows, found = [];
     let cursor = false;  // claude 선택 목록에는 고른 줄 앞에 ❯가 있다(답 속 번호 목록과 구분)
-    for (let y = 0; y < rows - SET.statusRows; y++) {
+    for (let y = SET.tabTop ? SET.statusRows : 0; y < rows - (SET.tabTop ? 0 : SET.statusRows); y++) {
       const line = buf.getLine(buf.viewportY + y);
       const m = line && CHOICE_RE.exec(line.translateToString(true));
       if (m) { found.push([m[1], m[2]]); if (/❯/.test(line.translateToString(true))) cursor = true; }
@@ -910,7 +910,7 @@ SCRIPT = """<script id="cchat-script">
       bar = document.createElement('div');
       bar.id = 'cchat-choices';
       bar.style.cssText = 'position:fixed;right:8px;z-index:12;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100vw - 16px);'
-        + 'bottom:' + (mobile ? 'calc(96px + env(safe-area-inset-bottom))' : '64px');  // 키 바·탭 두 줄 위
+        + 'bottom:' + (mobile ? (SET.tabTop ? 'calc(56px + env(safe-area-inset-bottom))' : 'calc(96px + env(safe-area-inset-bottom))') : (SET.tabTop ? '16px' : '64px'));  // 키 바(·아래 탭 두 줄) 위
       document.body.appendChild(bar);
     }
     bar.textContent = '';
@@ -964,11 +964,11 @@ SCRIPT = """<script id="cchat-script">
     const ko = /^ko/i.test(navigator.language || '');
     const lines = ko
       ? (mobile
-        ? ['아래 줄이 대화 탭 — 누르면 바뀜, + 는 새 대화', '⠹ = 작업 중 · 주황 = 확인 필요 · 녹색 = 끝남', '손가락으로 끌면 스크롤, 맨 아래 키 바로 Esc·Tab·방향키', '설정은 claude에게 말로 (예: "폰 글자 크게")']
-        : ['아래 줄이 대화 탭 — 클릭 또는 Alt+숫자, Alt+←/→', '+ 는 새 대화 (또는 주소에 ?arg=이름)', '⠹ = 작업 중 · 주황 = 확인 필요 · 녹색 = 끝남', '설정은 claude에게 말로 (예: "PC는 다크 테마로")'])
+        ? [(SET.tabTop ? '위' : '아래') + ' 줄이 대화 탭 — 누르면 바뀜, + 는 새 대화', '⠹ = 작업 중 · 주황 = 확인 필요 · 녹색 = 끝남', '손가락으로 끌면 스크롤, 맨 아래 키 바로 Esc·Tab·방향키', '설정은 claude에게 말로 (예: "폰 글자 크게")']
+        : [(SET.tabTop ? '위' : '아래') + ' 줄이 대화 탭 — 클릭 또는 Alt+숫자, Alt+←/→', '+ 는 새 대화 (또는 주소에 ?arg=이름)', '⠹ = 작업 중 · 주황 = 확인 필요 · 녹색 = 끝남', '설정은 claude에게 말로 (예: "PC는 다크 테마로")'])
       : (mobile
-        ? ['Bottom rows are session tabs — tap to switch, + opens a new one', '⠹ = working · orange = needs you · green = done', 'Drag to scroll; the key bar has Esc, Tab and arrows', 'Change settings by asking claude (e.g. "bigger font on my phone")']
-        : ['Bottom rows are session tabs — click, or Alt+number, Alt+←/→', '+ opens a new session (or ?arg=name in the URL)', '⠹ = working · orange = needs you · green = done', 'Change settings by asking claude (e.g. "dark theme on PC")']);
+        ? [(SET.tabTop ? 'Top' : 'Bottom') + ' rows are session tabs — tap to switch, + opens a new one', '⠹ = working · orange = needs you · green = done', 'Drag to scroll; the key bar has Esc, Tab and arrows', 'Change settings by asking claude (e.g. "bigger font on my phone")']
+        : [(SET.tabTop ? 'Top' : 'Bottom') + ' rows are session tabs — click, or Alt+number, Alt+←/→', '+ opens a new session (or ?arg=name in the URL)', '⠹ = working · orange = needs you · green = done', 'Change settings by asking claude (e.g. "dark theme on PC")']);
     const card = document.createElement('div');
     card.id = 'cchat-hint';
     card.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:25;max-width:min(440px,calc(100vw - 24px));'
@@ -1056,7 +1056,7 @@ def settings() -> dict:
         lines, two = int(out[0]), out[1:] == ["two"]
     except (OSError, ValueError, IndexError, subprocess.SubprocessError):
         lines, two = (2 if rows <= 1 else rows), rows <= 1
-    return {"statusRows": lines, "tabTwoLine": two, "tabRows": rows, "fontPc": font_px("font.pc"), "fontPhone": font_px("font.phone"), "snips": snips,
+    return {"statusRows": lines, "tabTwoLine": two, "tabRows": rows, "tabTop": setting("tab.place", "아래") in ("위", "top"), "fontPc": font_px("font.pc"), "fontPhone": font_px("font.phone"), "snips": snips,
             "themePc": theme("theme.pc", "light"), "themePhone": theme("theme.phone", "dark")}
 
 
